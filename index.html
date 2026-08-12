@@ -1,1 +1,333 @@
- 
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <!-- ==================== META TAGS ==================== -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    
+    <!-- SEO Meta Tags -->
+    <title>Kenven Hub - Resources & Tutorials</title>
+    <meta name="description" content="Kenven Hub - Your ultimate resource center for apps, tools, tutorials, and exclusive deals. Part of Kenven Service family.">
+    <meta name="keywords" content="kenven, hub, resources, tutorials, apps, tools, deals, guides">
+    <meta name="author" content="Kenven Service">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://your-username.github.io/kenven-hub/">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://your-username.github.io/kenven-hub/">
+    <meta property="og:title" content="Kenven Hub - Resources & Tutorials">
+    <meta property="og:description" content="Your ultimate resource center for apps, tools, tutorials, and exclusive deals.">
+    <meta property="og:image" content="https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg">
+    <meta property="og:site_name" content="Kenven Hub">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://your-username.github.io/kenven-hub/">
+    <meta name="twitter:title" content="Kenven Hub - Resources & Tutorials">
+    <meta name="twitter:description" content="Your ultimate resource center for apps, tools, tutorials, and exclusive deals.">
+    <meta name="twitter:image" content="https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg">
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#161616">
+    <meta name="msapplication-TileColor" content="#161616">
+    
+    <!-- ==================== PWA ==================== -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Kenven Hub">
+    <link rel="apple-touch-icon" href="https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg">
+    <link rel="icon" type="image/jpeg" href="https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg">
+    
+    <!-- ==================== FONTS ==================== -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Cairo:wght@300;400;600;700;900&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- ==================== FONT AWESOME ==================== -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    
+    <!-- ==================== STYLESHEET ==================== -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- ==================== STRUCTURED DATA ==================== -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Kenven Hub",
+      "url": "https://your-username.github.io/kenven-hub/",
+      "description": "Resources & Tutorials Center",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Kenven Service",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg"
+        }
+      }
+    }
+    </script>
+</head>
+<body>
+    <!-- ==================== LOADING SCREEN ==================== -->
+    <div id="loader" class="loader" aria-hidden="true">
+        <div class="loader-content">
+            <div class="loader-logo">
+                <img src="https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg" alt="Kenven Hub Logo" class="loader-img">
+            </div>
+            <div class="loader-text">
+                <span class="loader-title">KENVEN HUB</span>
+                <span class="loader-subtitle" data-en="Initializing..." data-ar="جاري التحميل...">Initializing...</span>
+            </div>
+            <div class="loader-bar">
+                <div class="loader-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== CUSTOM CURSOR ==================== -->
+    <div id="cursor-dot" class="cursor-dot" aria-hidden="true"></div>
+    <div id="cursor-ring" class="cursor-ring" aria-hidden="true"></div>
+    <div id="cursor-trail" class="cursor-trail" aria-hidden="true"></div>
+
+    <!-- ==================== PARTICLES BACKGROUND ==================== -->
+    <canvas id="particles-canvas" class="particles-canvas" aria-hidden="true"></canvas>
+
+    <!-- ==================== SCROLL PROGRESS BAR ==================== -->
+    <div id="scroll-progress" class="scroll-progress" aria-hidden="true">
+        <div class="scroll-progress-bar"></div>
+    </div>
+
+    <!-- ==================== NAVBAR ==================== -->
+    <nav id="navbar" class="navbar" role="navigation" aria-label="Main Navigation">
+        <div class="navbar-container">
+            <!-- Logo -->
+            <a href="#home" class="navbar-logo" aria-label="Kenven Hub Home">
+                <img src="https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg" alt="Kenven Hub" class="navbar-logo-img">
+                <span class="navbar-logo-text">
+                    <span class="logo-main">KENVEN</span>
+                    <span class="logo-sub">HUB</span>
+                </span>
+            </a>
+
+            <!-- Nav Links -->
+            <div class="navbar-links" id="navbar-links">
+                <a href="#home" class="nav-link active" data-en="Home" data-ar="الرئيسية">Home</a>
+                <a href="#posts" class="nav-link" data-en="Posts" data-ar="المنشورات">Posts</a>
+                <a href="#categories" class="nav-link" data-en="Categories" data-ar="التصنيفات">Categories</a>
+                <a href="#affiliate" class="nav-link" data-en="Deals" data-ar="العروض">Deals</a>
+                <a href="#about" class="nav-link" data-en="About" data-ar="حول">About</a>
+            </div>
+
+            <!-- Nav Actions -->
+            <div class="navbar-actions">
+                <!-- Search Button -->
+                <button class="nav-action-btn" id="search-btn" aria-label="Search" title="Search">
+                    <i class="fas fa-search"></i>
+                </button>
+
+                <!-- Language Switcher -->
+                <button class="nav-action-btn" id="lang-switcher" aria-label="Switch Language" title="Switch Language">
+                    <span class="lang-text">AR</span>
+                </button>
+
+                <!-- Effects Toggle -->
+                <button class="nav-action-btn" id="effects-toggle" aria-label="Toggle Effects" title="Toggle Effects">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                </button>
+
+                <!-- Admin Button (Hidden - Ctrl+Shift+A to access) -->
+                <button class="nav-action-btn admin-btn" id="admin-btn" aria-label="Admin Panel" title="Admin Panel">
+                    <i class="fas fa-user-shield"></i>
+                </button>
+
+                <!-- Mobile Menu Toggle -->
+                <button class="nav-action-btn mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle Menu" aria-expanded="false">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Menu -->
+        <div class="mobile-menu" id="mobile-menu" aria-hidden="true">
+            <a href="#home" class="mobile-nav-link" data-en="Home" data-ar="الرئيسية">Home</a>
+            <a href="#posts" class="mobile-nav-link" data-en="Posts" data-ar="المنشورات">Posts</a>
+            <a href="#categories" class="mobile-nav-link" data-en="Categories" data-ar="التصنيفات">Categories</a>
+            <a href="#affiliate" class="mobile-nav-link" data-en="Deals" data-ar="العروض">Deals</a>
+            <a href="#about" class="mobile-nav-link" data-en="About" data-ar="حول">About</a>
+        </div>
+    </nav>
+
+    <!-- ==================== MAIN CONTENT (SPA Container) ==================== -->
+    <main id="main-content" class="main-content" role="main">
+        <!-- Content will be injected here by app.js -->
+        <div id="app-container" class="app-container"></div>
+    </main>
+
+    <!-- ==================== FOOTER ==================== -->
+    <footer class="footer" role="contentinfo">
+        <div class="footer-container">
+            <!-- Footer Top -->
+            <div class="footer-top">
+                <!-- Brand Section -->
+                <div class="footer-brand">
+                    <div class="footer-logo">
+                        <img src="https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg" alt="Kenven Hub" class="footer-logo-img">
+                        <span class="footer-logo-text">KENVEN HUB</span>
+                    </div>
+                    <p class="footer-description" data-en="Your ultimate resource center for apps, tools, tutorials, and exclusive deals. Part of Kenven Service family." data-ar="مركزك الشامل للتطبيقات والأدوات والشروحات والعروض الحصرية. جزء من عائلة Kenven Service.">
+                        Your ultimate resource center for apps, tools, tutorials, and exclusive deals. Part of Kenven Service family.
+                    </p>
+                    <!-- Social Links -->
+                    <div class="footer-social">
+                        <a href="https://discord.com/channels/1256937655984328714/" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="Discord">
+                            <i class="fab fa-discord"></i>
+                        </a>
+                        <a href="https://yassine.com/" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="Website">
+                            <i class="fas fa-globe"></i>
+                        </a>
+                        <a href="#" class="social-link" aria-label="Twitter">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="#" class="social-link" aria-label="YouTube">
+                            <i class="fab fa-youtube"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Quick Links -->
+                <div class="footer-links">
+                    <h3 class="footer-title" data-en="Quick Links" data-ar="روابط سريعة">Quick Links</h3>
+                    <ul class="footer-list">
+                        <li><a href="#home" data-en="Home" data-ar="الرئيسية">Home</a></li>
+                        <li><a href="#posts" data-en="All Posts" data-ar="كل المنشورات">All Posts</a></li>
+                        <li><a href="#categories" data-en="Categories" data-ar="التصنيفات">Categories</a></li>
+                        <li><a href="#affiliate" data-en="Deals & Offers" data-ar="العروض والخصومات">Deals & Offers</a></li>
+                    </ul>
+                </div>
+
+                <!-- Categories -->
+                <div class="footer-links">
+                    <h3 class="footer-title" data-en="Categories" data-ar="التصنيفات">Categories</h3>
+                    <ul class="footer-list" id="footer-categories">
+                        <!-- Populated by JS -->
+                    </ul>
+                </div>
+
+                <!-- Newsletter -->
+                <div class="footer-newsletter">
+                    <h3 class="footer-title" data-en="Newsletter" data-ar="النشرة البريدية">Newsletter</h3>
+                    <p class="newsletter-text" data-en="Subscribe to get the latest resources and deals." data-ar="اشترك للحصول على أحدث الموارد والعروض.">
+                        Subscribe to get the latest resources and deals.
+                    </p>
+                    <form id="newsletter-form" class="newsletter-form">
+                        <input type="email" id="newsletter-email" class="newsletter-input" placeholder="Enter your email" data-en-placeholder="Enter your email" data-ar-placeholder="أدخل بريدك الإلكتروني" required aria-label="Email for newsletter">
+                        <button type="submit" class="newsletter-btn" data-en="Subscribe" data-ar="اشترك">Subscribe</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Footer Bottom -->
+            <div class="footer-bottom">
+                <div class="footer-copyright">
+                    <span data-en="© 2026 Kenven Hub. All rights reserved." data-ar="© 2026 Kenven Hub. جميع الحقوق محفوظة.">© 2026 Kenven Hub. All rights reserved.</span>
+                </div>
+                <div class="footer-legal">
+                    <a href="#privacy" data-en="Privacy Policy" data-ar="سياسة الخصوصية">Privacy Policy</a>
+                    <span class="separator">|</span>
+                    <a href="#terms" data-en="Terms of Service" data-ar="شروط الخدمة">Terms of Service</a>
+                    <span class="separator">|</span>
+                    <a href="#affiliate-disclosure" data-en="Affiliate Disclosure" data-ar="إفصاح الأفلييت">Affiliate Disclosure</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ==================== SEARCH MODAL ==================== -->
+    <div id="search-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="search-modal-title" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content search-modal-content">
+            <div class="search-header">
+                <h2 id="search-modal-title" class="search-title" data-en="Search Kenven Hub" data-ar="ابحث في Kenven Hub">Search Kenven Hub</h2>
+                <button class="modal-close" id="search-close" aria-label="Close Search">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="search-body">
+                <div class="search-input-wrapper">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="search-input" class="search-input" placeholder="Type to search..." data-en-placeholder="Type to search..." data-ar-placeholder="اكتب للبحث..." aria-label="Search input">
+                </div>
+                <!-- Search Filters -->
+                <div class="search-filters">
+                    <button class="filter-chip active" data-filter="all" data-en="All" data-ar="الكل">All</button>
+                    <button class="filter-chip" data-filter="apps" data-en="Apps" data-ar="تطبيقات">Apps</button>
+                    <button class="filter-chip" data-filter="websites" data-en="Websites" data-ar="مواقع">Websites</button>
+                    <button class="filter-chip" data-filter="activation" data-en="Activation" data-ar="تفعيل">Activation</button>
+                    <button class="filter-chip" data-filter="fixes" data-en="Fixes" data-ar="إصلاحات">Fixes</button>
+                    <button class="filter-chip" data-filter="deals" data-en="Deals" data-ar="عروض">Deals</button>
+                    <button class="filter-chip" data-filter="guides" data-en="Guides" data-ar="أدلة">Guides</button>
+                </div>
+                <!-- Search Results -->
+                <div id="search-results" class="search-results">
+                    <div class="search-empty" data-en="Start typing to see results..." data-ar="ابدأ الكتابة لرؤية النتائج...">
+                        Start typing to see results...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SHARE MODAL ==================== -->
+    <div id="share-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="share-modal-title" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content share-modal-content">
+            <div class="share-header">
+                <h2 id="share-modal-title" class="share-title" data-en="Share this post" data-ar="شارك هذا المنشور">Share this post</h2>
+                <button class="modal-close" id="share-close" aria-label="Close Share">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="share-body">
+                <div class="share-buttons">
+                    <button class="share-btn twitter" data-platform="twitter" aria-label="Share on Twitter">
+                        <i class="fab fa-twitter"></i>
+                        <span>Twitter</span>
+                    </button>
+                    <button class="share-btn facebook" data-platform="facebook" aria-label="Share on Facebook">
+                        <i class="fab fa-facebook-f"></i>
+                        <span>Facebook</span>
+                    </button>
+                    <button class="share-btn whatsapp" data-platform="whatsapp" aria-label="Share on WhatsApp">
+                        <i class="fab fa-whatsapp"></i>
+                        <span>WhatsApp</span>
+                    </button>
+                    <button class="share-btn telegram" data-platform="telegram" aria-label="Share on Telegram">
+                        <i class="fab fa-telegram"></i>
+                        <span>Telegram</span>
+                    </button>
+                    <button class="share-btn copy" data-platform="copy" aria-label="Copy Link">
+                        <i class="fas fa-link"></i>
+                        <span data-en="Copy Link" data-ar="نسخ الرابط">Copy Link</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TOAST CONTAINER ==================== -->
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- ==================== BACK TO TOP BUTTON ==================== -->
+    <button id="back-to-top" class="back-to-top" aria-label="Back to Top" title="Back to Top">
+        <i class="fas fa-chevron-up"></i>
+    </button>
+
+    <!-- ==================== SCRIPTS ==================== -->
+    <script src="app.js" defer></script>
+</body>
+</html>
