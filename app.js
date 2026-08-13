@@ -1594,7 +1594,7 @@ const Pages = {
         
         const tools = [
             { name: 'Hostinger', icon: 'fa-server', color: '#673DE6', rating: 4.8, desc: { en: 'Premium web hosting with free domain and SSL', ar: 'استضافة ويب مميزة مع دومين و SSL مجاني' }, url: 'https://hostinger.com?ref=kenven' },
-            { name: 'Cloudways', icon: 'fa-cloud', color: '#2C39BD', rating: 4.7, desc: { en: 'Managed cloud hosting for developers', ar: 'استضافة سحابية مُدارة للمطورين' }, url: 'https://cloudways.com?ref=kenven' },
+            { name: 'Cloudways', icon: 'fa-cloud', color: '#2C39BD', rating: 4.7, desc: { en: 'Managed cloud hosting for developers', ar: 'استضافة سحابية مُدارة للمطورين' }, url: 'https://www.cloudways.com/en/?id=2197866' },
             { name: 'Fiverr', icon: 'fa-briefcase', color: '#1DBF73', rating: 4.5, desc: { en: 'Freelance services for your business', ar: 'خدمات فريلانس لأعمالك' }, url: 'https://fiverr.com?ref=kenven' },
             { name: 'Namecheap', icon: 'fa-globe', color: '#DE3723', rating: 4.6, desc: { en: 'Domain names and hosting at great prices', ar: 'دومينات واستضافة بأسعار رائعة' }, url: 'https://namecheap.com?ref=kenven' },
             { name: 'Canva', icon: 'fa-palette', color: '#00C4CC', rating: 4.9, desc: { en: 'Design anything with easy-to-use tools', ar: 'صمم أي شيء بأدوات سهلة الاستخدام' }, url: 'https://canva.com?ref=kenven' },
