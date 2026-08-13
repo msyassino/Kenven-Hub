@@ -928,6 +928,9 @@ const AdminApp = {
         // Initialize auth
         AdminAuth.init();
         
+        // Initialize login form
+        this.initLoginForm();
+        
         // Initialize navigation
         AdminNav.init();
         
