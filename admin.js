@@ -1,11 +1,11 @@
 /* ================================================================
-   KENVEN HUB - ADMIN PANEL
-   Vanilla JS - No Frameworks
+   KENVEN HUB - ADMIN PANEL (FINAL)
+   Firebase Auth + Firestore - Full Cloud Management
    ================================================================ */
 
 'use strict';
 
-// ==================== 1. CONFIGURATION ====================
+// ==================== 1. CONFIG ====================
 const ADMIN_CONFIG = {
     firebase: {
         apiKey: "AIzaSyDQ7q03kfdOQAm_B03O47GlC4v8DCru94E",
@@ -17,1032 +17,607 @@ const ADMIN_CONFIG = {
         appId: "1:181277894032:web:7f42a19f3bcf3ea3033f15",
         measurementId: "G-VLW5MCJ2CM"
     },
-    
-    USE_FIREBASE: false,
-    
-    adminCredentials: {
-        email: "admin@kenven.com",
-        password: "kenven2026"
-    },
-    
-    storageKeys: {
-        lang: 'kenven_hub_lang',
-        posts: 'kenven_hub_posts_data',
-        comments: 'kenven_hub_comments_data',
-        adminSession: 'kenven_hub_admin_session',
-        settings: 'kenven_hub_settings',
-        affiliateLinks: 'kenven_hub_affiliate_links'
-    },
-    
-    sessionTimeout: 30 * 60 * 1000 // 30 minutes
+    adminEmail: "admin@kenven.com",
+    sessionKey: 'kenven_hub_admin_session',
+    sessionTimeout: 30 * 60 * 1000
 };
 
-// ==================== 2. UTILITIES ====================
-const AdminUtils = {
-    escapeHtml(str) {
-        if (typeof str !== 'string') return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    },
-    
-    formatDate(timestamp) {
-        const date = new Date(timestamp);
-        return date.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
-        });
-    },
-    
-    generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2);
-    },
-    
-    generateSlug(title) {
-        return title
-            .toLowerCase()
-            .replace(/[^\w\s-]/g, '')
-            .replace(/\s+/g, '-')
-            .replace(/-+/g, '-')
-            .trim();
-    },
-    
-    showToast(message, type = 'info') {
-        const container = document.getElementById('toast-container');
-        if (!container) return;
-        
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        
-        const icons = {
-            success: 'fa-check-circle',
-            error: 'fa-exclamation-circle',
-            warning: 'fa-exclamation-triangle',
-            info: 'fa-info-circle'
-        };
-        
-        toast.innerHTML = `
-            <i class="fas ${icons[type]} toast-icon"></i>
-            <span class="toast-message">${this.escapeHtml(message)}</span>
-        `;
-        
-        container.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
-    },
-    
-    confirm(message) {
-        return window.confirm(message);
+const CATEGORIES = [
+    { id: 'apps', slug: 'apps', name: { en: 'Apps & Tools', ar: 'تطبيقات وأدوات' }, icon: 'fa-mobile-screen', color: '#5B9FFF' },
+    { id: 'websites', slug: 'websites', name: { en: 'Websites', ar: 'مواقع' }, icon: 'fa-globe', color: '#8B5CF6' },
+    { id: 'activation', slug: 'activation', name: { en: 'Activation', ar: 'تفعيل' }, icon: 'fa-key', color: '#00FF9D' },
+    { id: 'fixes', slug: 'fixes', name: { en: 'Fixes & Tutorials', ar: 'إصلاحات وشروحات' }, icon: 'fa-screwdriver-wrench', color: '#FFE600' },
+    { id: 'deals', slug: 'deals', name: { en: 'Deals & Offers', ar: 'عروض وخصومات' }, icon: 'fa-tag', color: '#FF2E63' },
+    { id: 'guides', slug: 'guides', name: { en: 'Guides', ar: 'أدلة' }, icon: 'fa-book', color: '#5B9FFF' }
+];
+
+// ==================== 2. UTILS ====================
+const AUtils = {
+    esc(s) { if (typeof s !== 'string') return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; },
+    date(ts) { try { return new Date(ts).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); } catch (e) { return ''; } },
+    id() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 8); },
+    slug(t) { return (t || '').toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim(); },
+    toast(msg, type = 'info') {
+        const c = document.getElementById('toast-container');
+        if (!c) return;
+        const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
+        const t = document.createElement('div');
+        t.className = 'toast ' + type;
+        t.innerHTML = '<i class="fas ' + icons[type] + ' toast-icon"></i><span class="toast-message">' + this.esc(msg) + '</span>';
+        c.appendChild(t);
+        setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
     }
 };
 
-// ==================== 3. STORAGE ====================
-const AdminStorage = {
-    get(key, defaultValue = null) {
-        try {
-            const item = localStorage.getItem(key);
-            return item ? JSON.parse(item) : defaultValue;
-        } catch (e) {
-            return defaultValue;
-        }
-    },
-    
-    set(key, value) {
-        try {
-            localStorage.setItem(key, JSON.stringify(value));
-            return true;
-        } catch (e) {
-            return false;
-        }
-    },
-    
-    remove(key) {
-        localStorage.removeItem(key);
-    }
-};
+// ==================== 3. FIREBASE ====================
+let db = null, auth = null, FB_OK = false;
+try {
+    firebase.initializeApp(ADMIN_CONFIG.firebase);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    FB_OK = true;
+} catch (e) { console.error('Firebase init failed:', e); }
 
-// ==================== 4. DATA LAYER ====================
-const AdminData = {
-    // Default Mock Data
-    defaultPosts: [
-        {
-            id: 'post-1',
-            slug: 'top-10-productivity-apps-2026',
-            title: { en: 'Top 10 Productivity Apps for 2026', ar: 'أفضل 10 تطبيقات للإنتاجية في 2026' },
-            excerpt: { en: 'Discover the best productivity apps.', ar: 'اكتشف أفضل تطبيقات الإنتاجية.' },
-            content: { en: '<h2>Introduction</h2><p>Productivity apps content...</p>', ar: '<h2>مقدمة</h2><p>محتوى تطبيقات الإنتاجية...</p>' },
-            category: 'apps',
-            coverImage: 'https://picsum.photos/seed/apps1/800/450',
-            downloadLink: 'https://example.com/apps',
-            buttonText: { en: 'Download', ar: 'تحميل' },
-            isAffiliate: false,
-            tags: ['productivity', 'apps'],
-            featured: true,
-            status: 'published',
-            views: 1250,
-            likes: 89,
-            commentsCount: 12,
-            createdAt: Date.now() - 86400000 * 2,
-            updatedAt: Date.now() - 86400000 * 2
-        },
-        {
-            id: 'post-2',
-            slug: 'windows-activation-guide',
-            title: { en: 'Windows Activation Guide', ar: 'دليل تفعيل ويندوز' },
-            excerpt: { en: 'Complete guide to Windows activation.', ar: 'دليل شامل لتفعيل ويندوز.' },
-            content: { en: '<h2>Activation Methods</h2><p>Content here...</p>', ar: '<h2>طرق التفعيل</h2><p>المحتوى هنا...</p>' },
-            category: 'activation',
-            coverImage: 'https://picsum.photos/seed/win2/800/450',
-            downloadLink: 'https://microsoft.com',
-            buttonText: { en: 'Visit', ar: 'زيارة' },
-            isAffiliate: false,
-            tags: ['windows', 'activation'],
-            featured: false,
-            status: 'published',
-            views: 2100,
-            likes: 145,
-            commentsCount: 23,
-            createdAt: Date.now() - 86400000 * 7,
-            updatedAt: Date.now() - 86400000 * 7
-        }
-    ],
-    
-    defaultComments: [
-        {
-            id: 'comment-1',
-            postId: 'post-1',
-            authorName: 'Ahmed',
-            authorEmail: 'ahmed@example.com',
-            content: 'Great post! Very helpful.',
-            parentId: null,
-            isAdmin: false,
-            approved: true,
-            likes: 12,
-            createdAt: Date.now() - 86400000
-        }
-    ],
-    
-    getPosts() {
-        let posts = AdminStorage.get(ADMIN_CONFIG.storageKeys.posts);
-        if (!posts) {
-            posts = this.defaultPosts;
-            AdminStorage.set(ADMIN_CONFIG.storageKeys.posts, posts);
-        }
-        return posts;
-    },
-    
-    savePosts(posts) {
-        AdminStorage.set(ADMIN_CONFIG.storageKeys.posts, posts);
-    },
-    
-    getPostById(id) {
-        return this.getPosts().find(p => p.id === id);
-    },
-    
-    addPost(post) {
-        const posts = this.getPosts();
-        posts.unshift(post);
-        this.savePosts(posts);
-    },
-    
-    updatePost(id, updatedData) {
-        const posts = this.getPosts();
-        const index = posts.findIndex(p => p.id === id);
-        if (index !== -1) {
-            posts[index] = { ...posts[index], ...updatedData, updatedAt: Date.now() };
-            this.savePosts(posts);
-            return true;
-        }
-        return false;
-    },
-    
-    deletePost(id) {
-        const posts = this.getPosts().filter(p => p.id !== id);
-        this.savePosts(posts);
-    },
-    
-    getComments() {
-        let comments = AdminStorage.get(ADMIN_CONFIG.storageKeys.comments);
-        if (!comments) {
-            comments = this.defaultComments;
-            AdminStorage.set(ADMIN_CONFIG.storageKeys.comments, comments);
-        }
-        return comments;
-    },
-    
-    saveComments(comments) {
-        AdminStorage.set(ADMIN_CONFIG.storageKeys.comments, comments);
-    },
-    
-    updateComment(id, updatedData) {
-        const comments = this.getComments();
-        const index = comments.findIndex(c => c.id === id);
-        if (index !== -1) {
-            comments[index] = { ...comments[index], ...updatedData };
-            this.saveComments(comments);
-            return true;
-        }
-        return false;
-    },
-    
-    deleteComment(id) {
-        const comments = this.getComments().filter(c => c.id !== id);
-        this.saveComments(comments);
-    },
-    
-    getCategories() {
-        return [
-            { id: 'apps', slug: 'apps', name: { en: 'Apps & Tools', ar: 'تطبيقات وأدوات' }, icon: 'fa-mobile-screen', color: '#5B9FFF' },
-            { id: 'websites', slug: 'websites', name: { en: 'Websites', ar: 'مواقع' }, icon: 'fa-globe', color: '#8B5CF6' },
-            { id: 'activation', slug: 'activation', name: { en: 'Activation', ar: 'تفعيل' }, icon: 'fa-key', color: '#00FF9D' },
-            { id: 'fixes', slug: 'fixes', name: { en: 'Fixes & Tutorials', ar: 'إصلاحات وشروحات' }, icon: 'fa-screwdriver-wrench', color: '#FFE600' },
-            { id: 'deals', slug: 'deals', name: { en: 'Deals & Offers', ar: 'عروض وخصومات' }, icon: 'fa-tag', color: '#FF2E63' },
-            { id: 'guides', slug: 'guides', name: { en: 'Guides', ar: 'أدلة' }, icon: 'fa-book', color: '#5B9FFF' }
-        ];
-    },
-    
-    getAffiliateLinks() {
-        return AdminStorage.get(ADMIN_CONFIG.storageKeys.affiliateLinks, [
-            { id: '1', name: 'Hostinger', url: 'https://hostinger.com?ref=kenven', clicks: 0, active: true },
-            { id: '2', name: 'Cloudways', url: 'https://cloudways.com?ref=kenven', clicks: 0, active: true },
-            { id: '3', name: 'Fiverr', url: 'https://fiverr.com?ref=kenven', clicks: 0, active: true },
-            { id: '4', name: 'Namecheap', url: 'https://namecheap.com?ref=kenven', clicks: 0, active: true },
-            { id: '5', name: 'Canva', url: 'https://canva.com?ref=kenven', clicks: 0, active: true }
-        ]);
-    },
-    
-    getStats() {
-        const posts = this.getPosts();
-        const comments = this.getComments();
-        const totalViews = posts.reduce((sum, p) => sum + (p.views || 0), 0);
-        
-        return {
-            totalPosts: posts.length,
-            totalComments: comments.length,
-            totalViews: totalViews,
-            totalCategories: this.getCategories().length
-        };
-    }
-};
-
-// ==================== 5. AUTHENTICATION ====================
+// ==================== 4. AUTH ====================
 const AdminAuth = {
-    isAuthenticated: false,
-    
-    init() {
-        const session = AdminStorage.get(ADMIN_CONFIG.storageKeys.adminSession);
-        
-        if (session && this.isSessionValid(session)) {
-            this.isAuthenticated = true;
-            this.showDashboard();
-        } else {
-            AdminStorage.remove(ADMIN_CONFIG.storageKeys.adminSession);
-            this.showLogin();
-        }
-    },
-    
-    isSessionValid(session) {
-        if (!session || !session.loginTime) return false;
-        const elapsed = Date.now() - session.loginTime;
-        return elapsed < ADMIN_CONFIG.sessionTimeout;
-    },
-    
     async login(email, password) {
-        if (ADMIN_CONFIG.USE_FIREBASE) {
-            return { success: false, error: 'Firebase Auth not activated yet' };
-        }
-        
-        if (email === ADMIN_CONFIG.adminCredentials.email && 
-            password === ADMIN_CONFIG.adminCredentials.password) {
-            this.isAuthenticated = true;
-            AdminStorage.set(ADMIN_CONFIG.storageKeys.adminSession, {
-                email: email,
-                loginTime: Date.now()
-            });
+        if (!FB_OK) return { success: false, error: 'Firebase not available' };
+        try {
+            const cred = await auth.signInWithEmailAndPassword(email, password);
+            // Verify admin role
+            let isAdmin = false;
+            try {
+                const doc = await db.collection('users').doc(cred.user.uid).get();
+                isAdmin = doc.exists && doc.data().role === 'admin';
+            } catch (e) {
+                // Fallback: allow known admin email if users doc read fails
+                isAdmin = email === ADMIN_CONFIG.adminEmail;
+            }
+            if (!isAdmin) {
+                await auth.signOut();
+                return { success: false, error: 'Not authorized as admin' };
+            }
+            localStorage.setItem(ADMIN_CONFIG.sessionKey, JSON.stringify({ uid: cred.user.uid, email: email, time: Date.now() }));
             return { success: true };
+        } catch (e) {
+            return { success: false, error: 'Invalid email or password' };
         }
-        
-        return { success: false, error: 'Invalid email or password' };
+    },
+    
+    checkSession() {
+        try {
+            const s = JSON.parse(localStorage.getItem(ADMIN_CONFIG.sessionKey));
+            return s && (Date.now() - s.time) < ADMIN_CONFIG.sessionTimeout;
+        } catch (e) { return false; }
     },
     
     logout() {
-        this.isAuthenticated = false;
-        AdminStorage.remove(ADMIN_CONFIG.storageKeys.adminSession);
-        this.showLogin();
+        localStorage.removeItem(ADMIN_CONFIG.sessionKey);
+        if (FB_OK) auth.signOut();
+        location.reload();
+    }
+};
+
+// ==================== 5. DATA (Firestore) ====================
+const AData = {
+    async getPosts() {
+        if (!FB_OK) return [];
+        try { const s = await db.collection('posts').get(); return s.docs.map(d => d.data()); } catch (e) { return []; }
     },
     
-    showLogin() {
-        document.getElementById('login-screen').style.display = 'flex';
-        document.getElementById('admin-dashboard').style.display = 'none';
+    async savePost(data, id) {
+        if (id) { await db.collection('posts').doc(id).update(data); }
+        else { await db.collection('posts').doc(data.id).set(data); }
     },
     
-        showDashboard() {
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('admin-dashboard').style.display = 'block';
+    async deletePost(id) { await db.collection('posts').doc(id).delete(); },
+    
+    async getComments() {
+        try { const s = await db.collection('comments').limit(200).get(); return s.docs.map(d => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); } catch (e) { return []; }
+    },
+    
+    async updateComment(id, patch) { await db.collection('comments').doc(id).update(patch); },
+    async deleteComment(id) { await db.collection('comments').doc(id).delete(); },
+    
+    async getAffiliate() {
+        try { const s = await db.collection('affiliate_links').get(); return s.docs.map(d => d.data()); } catch (e) { return []; }
+    },
+    async saveAff(data) { await db.collection('affiliate_links').doc(data.id).set(data); },
+    async deleteAff(id) { await db.collection('affiliate_links').doc(id).delete(); },
+    
+    async getSettings() {
+        try { const d = await db.collection('settings').doc('site').get(); return d.exists ? d.data() : null; } catch (e) { return null; }
+    },
+    async saveSettings(obj) { await db.collection('settings').doc('site').set(obj, { merge: true }); },
+    
+    async getCodes() {
+        try { const s = await db.collection('coin_codes').get(); return s.docs.map(d => d.data()); } catch (e) { return []; }
+    },
+    async saveCode(data) { await db.collection('coin_codes').doc(data.code).set(data); },
+    async updateCode(code, patch) { await db.collection('coin_codes').doc(code).update(patch); },
+    async deleteCode(code) { await db.collection('coin_codes').doc(code).delete(); },
+    
+    async getWallets() {
+        try { const s = await db.collection('wallets').limit(200).get(); return s.docs.map(d => d.data()); } catch (e) { return []; }
+    },
+    async adjustWallet(id, delta) {
+        await db.collection('wallets').doc(id).update({ balance: firebase.firestore.FieldValue.increment(delta) });
     }
 };
 
 // ==================== 6. NAVIGATION ====================
-const AdminNav = {
-    currentTab: 'dashboard',
-    
+const ANav = {
     init() {
         document.querySelectorAll('.admin-nav-item[data-tab]').forEach(item => {
-            item.addEventListener('click', () => {
-                const tab = item.dataset.tab;
-                this.switchTab(tab);
-            });
+            item.addEventListener('click', () => this.switch(item.dataset.tab));
         });
-        
-        const viewSiteBtn = document.getElementById('view-site-btn');
-        if (viewSiteBtn) {
-            viewSiteBtn.addEventListener('click', () => {
-                window.open('index.html', '_blank');
-            });
-        }
-        
-        const logoutBtn = document.getElementById('logout-btn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => {
-                if (AdminUtils.confirm('Are you sure you want to logout?')) {
-                    AdminAuth.logout();
-                }
-            });
-        }
+        document.getElementById('view-site-btn')?.addEventListener('click', () => open('index.html', '_blank'));
+        document.getElementById('logout-btn')?.addEventListener('click', () => { if (confirm('Logout?')) AdminAuth.logout(); });
     },
     
-    switchTab(tab) {
-        this.currentTab = tab;
-        
-        document.querySelectorAll('.admin-nav-item[data-tab]').forEach(item => {
-            item.classList.toggle('active', item.dataset.tab === tab);
-        });
-        
-        document.querySelectorAll('.admin-tab').forEach(tabEl => {
-            tabEl.classList.toggle('active', tabEl.id === `tab-${tab}`);
-        });
-        
-        this.loadTabData(tab);
+    switch(tab) {
+        document.querySelectorAll('.admin-nav-item[data-tab]').forEach(i => i.classList.toggle('active', i.dataset.tab === tab));
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.toggle('active', t.id === 'tab-' + tab));
+        this.load(tab);
     },
     
-    loadTabData(tab) {
+    load(tab) {
         switch (tab) {
-            case 'dashboard':
-                Dashboard.render();
-                break;
-            case 'posts':
-                PostsManager.render();
-                break;
-            case 'comments':
-                CommentsManager.render();
-                break;
-            case 'categories':
-                CategoriesManager.render();
-                break;
-            case 'affiliate':
-                AffiliateManager.render();
-                break;
-            case 'analytics':
-                Analytics.render();
-                break;
-            case 'settings':
-                Settings.render();
-                break;
+            case 'dashboard': Dashboard.render(); break;
+            case 'posts': Posts.render(); break;
+            case 'comments': CommentsAdmin.render(); break;
+            case 'categories': CategoriesAdmin.render(); break;
+            case 'affiliate': AffiliateAdmin.render(); break;
+            case 'coins': CoinsAdmin.render(); break;
+            case 'analytics': AnalyticsAdmin.render(); break;
+            case 'settings': SettingsAdmin.render(); break;
         }
     }
 };
 
 // ==================== 7. DASHBOARD ====================
 const Dashboard = {
-    render() {
-        const stats = AdminData.getStats();
+    async render() {
+        const [posts, comments, wallets] = await Promise.all([AData.getPosts(), AData.getComments(), AData.getWallets()]);
+        const views = posts.reduce((s, p) => s + (p.views || 0), 0);
+        const coins = wallets.reduce((s, w) => s + (w.balance || 0), 0);
         
-        document.getElementById('stat-posts').textContent = stats.totalPosts;
-        document.getElementById('stat-comments').textContent = stats.totalComments;
-        document.getElementById('stat-views').textContent = stats.totalViews.toLocaleString();
-        document.getElementById('stat-categories').textContent = stats.totalCategories;
+        document.getElementById('stat-posts').textContent = posts.length;
+        document.getElementById('stat-comments').textContent = comments.length;
+        document.getElementById('stat-views').textContent = views.toLocaleString();
+        document.getElementById('stat-coins').textContent = coins.toLocaleString();
+        document.getElementById('dashboard-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         
-        document.getElementById('dashboard-date').textContent = new Date().toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
+        document.getElementById('recent-comments-list').innerHTML = comments.slice(0, 5).map(c =>
+            '<div class="comment-item"><div class="comment-avatar">' + AUtils.esc((c.authorName || '?').charAt(0).toUpperCase()) + '</div>' +
+            '<div class="comment-content"><div class="comment-author">' + AUtils.esc(c.authorName || '') + ' <span>· ' + AUtils.date(c.createdAt) + '</span></div>' +
+            '<div class="comment-text">' + AUtils.esc((c.content || '').substring(0, 100)) + '</div></div>' +
+            '<span class="status-badge ' + (c.approved ? 'status-approved' : 'status-pending') + '">' + (c.approved ? 'Approved' : 'Pending') + '</span></div>'
+        ).join('') || '<p style="color:var(--text-muted);text-align:center;padding:var(--space-lg);">No comments yet.</p>';
         
-        this.renderRecentComments();
-        this.renderTopPosts();
-    },
-    
-    renderRecentComments() {
-        const comments = AdminData.getComments()
-            .sort((a, b) => b.createdAt - a.createdAt)
-            .slice(0, 5);
-        
-        const container = document.getElementById('recent-comments-list');
-        
-        if (comments.length === 0) {
-            container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: var(--space-xl);">No comments yet.</p>';
-            return;
-        }
-        
-        container.innerHTML = comments.map(comment => `
-            <div class="comment-item">
-                <div class="comment-avatar">
-                    ${AdminUtils.escapeHtml(comment.authorName?.charAt(0).toUpperCase() || '?')}
-                </div>
-                <div class="comment-content">
-                    <div class="comment-author">
-                        ${AdminUtils.escapeHtml(comment.authorName)}
-                        <span>· ${AdminUtils.formatDate(comment.createdAt)}</span>
-                    </div>
-                    <div class="comment-text">
-                        ${AdminUtils.escapeHtml(comment.content?.substring(0, 100))}${comment.content?.length > 100 ? '...' : ''}
-                    </div>
-                </div>
-                <span class="status-badge ${comment.approved ? 'status-approved' : 'status-pending'}">
-                    ${comment.approved ? 'Approved' : 'Pending'}
-                </span>
-            </div>
-        `).join('');
-    },
-    
-    renderTopPosts() {
-        const posts = AdminData.getPosts()
-            .sort((a, b) => (b.views || 0) - (a.views || 0))
-            .slice(0, 5);
-        
-        const container = document.getElementById('top-posts-list');
-        
-        if (posts.length === 0) {
-            container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: var(--space-xl);">No posts yet.</p>';
-            return;
-        }
-        
-        container.innerHTML = posts.map((post, index) => {
-            const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
-            return `
-                <div class="top-post-item">
-                    <span class="top-post-rank ${rankClass}">${index + 1}</span>
-                    <div class="top-post-info">
-                        <div class="top-post-title">${AdminUtils.escapeHtml(post.title?.en || 'Untitled')}</div>
-                        <div class="top-post-stats">
-                            <i class="fas fa-eye"></i> ${post.views || 0} views
-                            · <i class="fas fa-comments"></i> ${post.commentsCount || 0} comments
-                        </div>
-                    </div>
-                    <a href="index.html#post/${post.slug}" target="_blank" class="action-btn view" title="View">
-                        <i class="fas fa-eye"></i>
-                    </a>
-                </div>
-            `;
-        }).join('');
+        const top = [...posts].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5);
+        document.getElementById('top-posts-list').innerHTML = top.map((p, i) =>
+            '<div class="top-post-item"><span class="top-post-rank ' + (i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '') + '">' + (i + 1) + '</span>' +
+            '<div class="top-post-info"><div class="top-post-title">' + AUtils.esc(p.title?.en || '') + '</div>' +
+            '<div class="top-post-stats"><i class="fas fa-eye"></i> ' + (p.views || 0) + ' · <i class="fas fa-coins"></i> ' + (p.coinPrice || 0) + '</div></div>' +
+            '<a href="index.html#post/' + AUtils.esc(p.slug) + '" target="_blank" class="action-btn view"><i class="fas fa-eye"></i></a></div>'
+        ).join('') || '<p style="color:var(--text-muted);text-align:center;padding:var(--space-lg);">No posts yet.</p>';
     }
 };
 
-// ==================== 8. POSTS MANAGER ====================
-const PostsManager = {
-    quillEditor: null,
-    editingPostId: null,
+// ==================== 8. POSTS ====================
+const Posts = {
+    quill: null,
+    editId: null,
+    affList: [],
     
     init() {
-        const newPostBtn = document.getElementById('new-post-btn');
-        if (newPostBtn) {
-            newPostBtn.addEventListener('click', () => this.showEditor());
-        }
-        
-        const cancelBtn = document.getElementById('cancel-post-btn');
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', () => this.hideEditor());
-        }
-        
-        const postForm = document.getElementById('post-form');
-        if (postForm) {
-            postForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.savePost();
-            });
-        }
-        
-        const titleEnInput = document.getElementById('post-title-en');
-        if (titleEnInput) {
-            titleEnInput.addEventListener('input', (e) => {
-                const slugInput = document.getElementById('post-slug');
-                if (slugInput && (!slugInput.value || slugInput.dataset.autoGenerated === 'true')) {
-                    slugInput.value = AdminUtils.generateSlug(e.target.value);
-                    slugInput.dataset.autoGenerated = 'true';
-                }
-            });
-        }
+        document.getElementById('new-post-btn')?.addEventListener('click', () => this.showEditor());
+        document.getElementById('cancel-post-btn')?.addEventListener('click', () => this.hideEditor());
+        document.getElementById('post-form')?.addEventListener('submit', (e) => { e.preventDefault(); this.save(); });
+        document.getElementById('post-title-en')?.addEventListener('input', (e) => {
+            const s = document.getElementById('post-slug');
+            if (!s.value) s.value = AUtils.slug(e.target.value);
+        });
     },
     
-    render() {
+    async render() {
         this.hideEditor();
-        
-        const posts = AdminData.getPosts();
-        const categories = AdminData.getCategories();
+        const posts = await AData.getPosts();
         const tbody = document.getElementById('posts-table-body');
-        
-        if (posts.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="table-empty">
-                        No posts yet. Click "New Post" to create your first post.
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-        
-        tbody.innerHTML = posts.map(post => {
-            const category = categories.find(c => c.id === post.category);
-            return `
-                <tr>
-                    <td>
-                        <div style="font-weight: 600; margin-bottom: 4px;">${AdminUtils.escapeHtml(post.title?.en || 'Untitled')}</div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">/${AdminUtils.escapeHtml(post.slug || '')}</div>
-                    </td>
-                    <td>
-                        ${category ? `
-                            <span style="color: ${category.color}; display: inline-flex; align-items: center; gap: 4px;">
-                                <i class="fas ${category.icon}"></i>
-                                ${category.name.en}
-                            </span>
-                        ` : '-'}
-                    </td>
-                    <td>
-                        <span class="status-badge status-${post.status}">
-                            ${post.status}
-                        </span>
-                    </td>
-                    <td>${(post.views || 0).toLocaleString()}</td>
-                    <td>${AdminUtils.formatDate(post.createdAt)}</td>
-                    <td>
-                        <div class="actions-cell">
-                            <button class="action-btn edit" onclick="PostsManager.editPost('${post.id}')" title="Edit">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <a href="index.html#post/${post.slug}" target="_blank" class="action-btn view" title="View">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                            <button class="action-btn delete" onclick="PostsManager.deletePost('${post.id}')" title="Delete">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
+        if (!posts.length) { tbody.innerHTML = '<tr><td colspan="6" class="table-empty">No posts yet. Click "New Post".</td></tr>'; return; }
+        tbody.innerHTML = posts.map(p => {
+            const cat = CATEGORIES.find(c => c.id === p.category);
+            return '<tr><td><div style="font-weight:600;margin-bottom:4px;">' + AUtils.esc(p.title?.en || '') + '</div><div style="font-size:.8rem;color:var(--text-muted);">/' + AUtils.esc(p.slug || '') + '</div></td>' +
+                '<td>' + (cat ? '<span style="color:' + cat.color + '"><i class="fas ' + cat.icon + '"></i> ' + cat.name.en + '</span>' : '-') + '</td>' +
+                '<td>' + (p.coinPrice > 0 ? '<span class="status-badge" style="background:rgba(255,215,0,.15);color:var(--gold);"><i class="fas fa-coins"></i> ' + p.coinPrice + '</span>' : '<span class="status-badge status-active">Free</span>') + '</td>' +
+                '<td><span class="status-badge status-' + p.status + '">' + p.status + '</span></td>' +
+                '<td>' + (p.views || 0) + '</td>' +
+                '<td><div class="actions-cell">' +
+                '<button class="action-btn edit" onclick="Posts.edit(\'' + p.id + '\')"><i class="fas fa-edit"></i></button>' +
+                '<a href="index.html#post/' + AUtils.esc(p.slug) + '" target="_blank" class="action-btn view"><i class="fas fa-eye"></i></a>' +
+                '<button class="action-btn delete" onclick="Posts.del(\'' + p.id + '\')"><i class="fas fa-trash"></i></button>' +
+                '</div></td></tr>';
         }).join('');
     },
     
-    showEditor(postId = null) {
-        this.editingPostId = postId;
+    async showEditor(id = null) {
+        this.editId = id;
+        this.affList = await AData.getAffiliate();
         
         document.getElementById('posts-list-container').style.display = 'none';
         document.getElementById('post-editor').style.display = 'block';
-        const header = document.querySelector('#tab-posts .admin-header');
-        if (header) header.style.display = 'none';
+        document.querySelector('#tab-posts .admin-header').style.display = 'none';
         
-        const categorySelect = document.getElementById('post-category');
-        categorySelect.innerHTML = AdminData.getCategories().map(cat => 
-            `<option value="${cat.id}">${cat.name.en}</option>`
-        ).join('');
+        document.getElementById('post-category').innerHTML = CATEGORIES.map(c => '<option value="' + c.id + '">' + c.name.en + '</option>').join('');
+        document.getElementById('post-affiliate-select').innerHTML = this.affList.map(a =>
+            '<label class="checkbox-label"><input type="checkbox" value="' + AUtils.esc(a.id) + '" class="post-aff-check"><span>' + AUtils.esc(a.name) + '</span></label>'
+        ).join('') || '<p style="color:var(--text-muted);font-size:.85rem;">No affiliate offers yet. Add them in Affiliate tab.</p>';
         
-        if (!this.quillEditor) {
-            this.quillEditor = new Quill('#post-content-editor', {
+        if (!this.quill) {
+            this.quill = new Quill('#post-content-editor', {
                 theme: 'snow',
-                placeholder: 'Write your post content here...',
-                modules: {
-                    toolbar: [
-                        [{ 'header': [1, 2, 3, false] }],
-                        ['bold', 'italic', 'underline', 'strike'],
-                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                        ['link', 'image', 'code-block'],
-                        ['clean']
-                    ]
-                }
+                modules: { toolbar: [[{ header: [1, 2, 3, false] }], ['bold', 'italic', 'underline', 'strike'], [{ list: 'ordered' }, { list: 'bullet' }], ['link', 'image', 'code-block'], ['clean']] }
             });
         }
         
-        if (postId) {
-            const post = AdminData.getPostById(postId);
-            if (post) {
+        if (id) {
+            const p = (await AData.getPosts()).find(x => x.id === id);
+            if (p) {
                 document.getElementById('post-editor-title').textContent = 'Edit Post';
-                document.getElementById('post-title-en').value = post.title?.en || '';
-                document.getElementById('post-title-ar').value = post.title?.ar || '';
-                document.getElementById('post-slug').value = post.slug || '';
-                document.getElementById('post-excerpt-en').value = post.excerpt?.en || '';
-                document.getElementById('post-excerpt-ar').value = post.excerpt?.ar || '';
-                document.getElementById('post-status').value = post.status || 'draft';
-                document.getElementById('post-category').value = post.category || 'apps';
-                document.getElementById('post-featured').checked = post.featured || false;
-                document.getElementById('post-cover').value = post.coverImage || '';
-                document.getElementById('post-download-link').value = post.downloadLink || '';
-                document.getElementById('post-button-text-en').value = post.buttonText?.en || '';
-                document.getElementById('post-button-text-ar').value = post.buttonText?.ar || '';
-                document.getElementById('post-is-affiliate').checked = post.isAffiliate || false;
-                document.getElementById('post-tags').value = (post.tags || []).join(', ');
-                
-                this.quillEditor.root.innerHTML = post.content?.en || '';
+                document.getElementById('post-title-en').value = p.title?.en || '';
+                document.getElementById('post-title-ar').value = p.title?.ar || '';
+                document.getElementById('post-slug').value = p.slug || '';
+                document.getElementById('post-excerpt-en').value = p.excerpt?.en || '';
+                document.getElementById('post-excerpt-ar').value = p.excerpt?.ar || '';
+                document.getElementById('post-status').value = p.status || 'draft';
+                document.getElementById('post-category').value = p.category || 'apps';
+                document.getElementById('post-featured').checked = !!p.featured;
+                document.getElementById('post-is-affiliate').checked = !!p.isAffiliate;
+                document.getElementById('post-coin-price').value = p.coinPrice || 0;
+                document.getElementById('post-cover').value = p.coverImage || '';
+                document.getElementById('post-download-link').value = p.downloadLink || '';
+                document.getElementById('post-button-text-en').value = p.buttonText?.en || '';
+                document.getElementById('post-button-text-ar').value = p.buttonText?.ar || '';
+                document.getElementById('post-tags').value = (p.tags || []).join(', ');
+                document.querySelectorAll('.post-aff-check').forEach(ch => { if ((p.affiliateIds || []).includes(ch.value)) ch.checked = true; });
+                this.quill.root.innerHTML = p.content?.en || '';
+                return;
             }
-        } else {
-            document.getElementById('post-editor-title').textContent = 'Create New Post';
-            document.getElementById('post-form').reset();
-            this.quillEditor.root.innerHTML = '';
         }
+        document.getElementById('post-editor-title').textContent = 'Create New Post';
+        document.getElementById('post-form').reset();
+        document.getElementById('post-coin-price').value = 0;
+        this.quill.root.innerHTML = '';
     },
     
     hideEditor() {
         document.getElementById('posts-list-container').style.display = 'block';
         document.getElementById('post-editor').style.display = 'none';
-        const header = document.querySelector('#tab-posts .admin-header');
-        if (header) header.style.display = 'flex';
-        this.editingPostId = null;
+        const h = document.querySelector('#tab-posts .admin-header');
+        if (h) h.style.display = 'flex';
+        this.editId = null;
     },
     
-    savePost() {
-        const titleEn = document.getElementById('post-title-en').value.trim();
-        const titleAr = document.getElementById('post-title-ar').value.trim();
-        const slug = document.getElementById('post-slug').value.trim();
+    async save() {
+        const tEn = document.getElementById('post-title-en').value.trim();
+        const tAr = document.getElementById('post-title-ar').value.trim();
+        if (!tEn || !tAr) { AUtils.toast('Fill both titles', 'error'); return; }
         
-        if (!titleEn || !titleAr) {
-            AdminUtils.showToast('Please fill in both English and Arabic titles', 'error');
-            return;
-        }
+        const affIds = [...document.querySelectorAll('.post-aff-check:checked')].map(c => c.value);
+        const existing = this.editId ? (await AData.getPosts()).find(p => p.id === this.editId) : null;
         
-        const contentHtml = this.quillEditor.root.innerHTML;
-        
-        const postData = {
-            title: { en: titleEn, ar: titleAr },
-            slug: slug || AdminUtils.generateSlug(titleEn),
-            excerpt: {
-                en: document.getElementById('post-excerpt-en').value.trim(),
-                ar: document.getElementById('post-excerpt-ar').value.trim()
-            },
-            content: {
-                en: contentHtml,
-                ar: contentHtml
-            },
+        const data = {
+            id: this.editId || AUtils.id(),
+            title: { en: tEn, ar: tAr },
+            slug: document.getElementById('post-slug').value.trim() || AUtils.slug(tEn),
+            excerpt: { en: document.getElementById('post-excerpt-en').value.trim(), ar: document.getElementById('post-excerpt-ar').value.trim() },
+            content: { en: this.quill.root.innerHTML, ar: this.quill.root.innerHTML },
             category: document.getElementById('post-category').value,
             coverImage: document.getElementById('post-cover').value.trim() || 'https://picsum.photos/seed/' + Math.random().toString(36).substr(2, 5) + '/800/450',
             downloadLink: document.getElementById('post-download-link').value.trim(),
-            buttonText: {
-                en: document.getElementById('post-button-text-en').value.trim() || 'Read More',
-                ar: document.getElementById('post-button-text-ar').value.trim() || 'اقرأ المزيد'
-            },
+            buttonText: { en: document.getElementById('post-button-text-en').value.trim() || 'Read More', ar: document.getElementById('post-button-text-ar').value.trim() || 'اقرأ المزيد' },
             isAffiliate: document.getElementById('post-is-affiliate').checked,
-            tags: document.getElementById('post-tags').value.split(',').map(t => t.trim()).filter(t => t),
+            affiliateIds: affIds,
+            tags: document.getElementById('post-tags').value.split(',').map(t => t.trim()).filter(Boolean),
             featured: document.getElementById('post-featured').checked,
-            status: document.getElementById('post-status').value
+            status: document.getElementById('post-status').value,
+            coinPrice: parseInt(document.getElementById('post-coin-price').value) || 0,
+            views: existing?.views || 0,
+            commentsCount: existing?.commentsCount || 0,
+            createdAt: existing?.createdAt || Date.now(),
+            updatedAt: Date.now(),
+            publishAt: null
         };
         
-        if (this.editingPostId) {
-            AdminData.updatePost(this.editingPostId, postData);
-            AdminUtils.showToast('Post updated successfully!', 'success');
-        } else {
-            const newPost = {
-                id: AdminUtils.generateId(),
-                ...postData,
-                views: 0,
-                likes: 0,
-                commentsCount: 0,
-                createdAt: Date.now(),
-                updatedAt: Date.now()
-            };
-            AdminData.addPost(newPost);
-            AdminUtils.showToast('Post created successfully!', 'success');
-        }
-        
-        this.hideEditor();
-        this.render();
-    },
-    
-    editPost(postId) {
-        this.showEditor(postId);
-    },
-    
-    deletePost(postId) {
-        if (AdminUtils.confirm('Are you sure you want to delete this post?')) {
-            AdminData.deletePost(postId);
-            AdminUtils.showToast('Post deleted', 'success');
+        try {
+            await AData.savePost(data, this.editId);
+            AUtils.toast(this.editId ? 'Post updated!' : 'Post created!', 'success');
+            this.hideEditor();
             this.render();
+        } catch (e) { AUtils.toast('Save failed: ' + e.message, 'error'); }
+    },
+    
+    async edit(id) { await this.showEditor(id); },
+    
+    async del(id) {
+        if (confirm('Delete this post permanently?')) {
+            try { await AData.deletePost(id); AUtils.toast('Post deleted', 'success'); this.render(); }
+            catch (e) { AUtils.toast('Delete failed', 'error'); }
         }
     }
 };
 
-// ==================== 9. COMMENTS MANAGER ====================
-const CommentsManager = {
-    render() {
-        const comments = AdminData.getComments();
-        const posts = AdminData.getPosts();
+// ==================== 9. COMMENTS ====================
+const CommentsAdmin = {
+    async render() {
+        const comments = await AData.getComments();
         const tbody = document.getElementById('comments-table-body');
-        
-        if (comments.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="table-empty">
-                        No comments yet.
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-        
-        tbody.innerHTML = comments.map(comment => {
-            const post = posts.find(p => p.id === comment.postId);
-            return `
-                <tr>
-                    <td>
-                        <div style="font-weight: 600;">${AdminUtils.escapeHtml(comment.authorName)}</div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">${AdminUtils.escapeHtml(comment.authorEmail)}</div>
-                    </td>
-                    <td>
-                        <div style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            ${AdminUtils.escapeHtml(comment.content)}
-                        </div>
-                    </td>
-                    <td>${post ? AdminUtils.escapeHtml(post.title?.en || 'Unknown') : 'Unknown'}</td>
-                    <td>
-                        <span class="status-badge ${comment.approved ? 'status-approved' : 'status-pending'}">
-                            ${comment.approved ? 'Approved' : 'Pending'}
-                        </span>
-                    </td>
-                    <td>${AdminUtils.formatDate(comment.createdAt)}</td>
-                    <td>
-                        <div class="actions-cell">
-                            ${!comment.approved ? `
-                                <button class="action-btn approve" onclick="CommentsManager.approveComment('${comment.id}')" title="Approve">
-                                    <i class="fas fa-check"></i>
-                                </button>
-                            ` : ''}
-                            <button class="action-btn delete" onclick="CommentsManager.deleteComment('${comment.id}')" title="Delete">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+        if (!comments.length) { tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No comments yet.</td></tr>'; return; }
+        tbody.innerHTML = comments.map(c =>
+            '<tr><td><div style="font-weight:600;">' + AUtils.esc(c.authorName || '') + '</div><div style="font-size:.8rem;color:var(--text-muted);">' + AUtils.esc(c.authorEmail || '') + '</div></td>' +
+            '<td><div style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + AUtils.esc(c.content || '') + '</div></td>' +
+            '<td><span class="status-badge ' + (c.approved ? 'status-approved' : 'status-pending') + '">' + (c.approved ? 'Approved' : 'Pending') + '</span></td>' +
+            '<td>' + AUtils.date(c.createdAt) + '</td>' +
+            '<td><div class="actions-cell">' +
+            (!c.approved ? '<button class="action-btn approve" onclick="CommentsAdmin.approve(\'' + c.id + '\')"><i class="fas fa-check"></i></button>' : '') +
+            '<button class="action-btn delete" onclick="CommentsAdmin.del(\'' + c.id + '\')"><i class="fas fa-trash"></i></button>' +
+            '</div></td></tr>'
+        ).join('');
     },
-    
-    approveComment(commentId) {
-        AdminData.updateComment(commentId, { approved: true });
-        AdminUtils.showToast('Comment approved', 'success');
-        this.render();
-    },
-    
-    deleteComment(commentId) {
-        if (AdminUtils.confirm('Delete this comment?')) {
-            AdminData.deleteComment(commentId);
-            AdminUtils.showToast('Comment deleted', 'success');
-            this.render();
-        }
-    }
+    async approve(id) { try { await AData.updateComment(id, { approved: true }); AUtils.toast('Approved', 'success'); this.render(); } catch (e) {} },
+    async del(id) { if (confirm('Delete comment?')) { try { await AData.deleteComment(id); AUtils.toast('Deleted', 'success'); this.render(); } catch (e) {} } }
 };
 
-// ==================== 10. CATEGORIES MANAGER ====================
-const CategoriesManager = {
-    render() {
-        const categories = AdminData.getCategories();
-        const posts = AdminData.getPosts();
-        const container = document.getElementById('categories-grid');
-        
-        container.innerHTML = categories.map(cat => {
-            const postCount = posts.filter(p => p.category === cat.id).length;
-            return `
-                <div class="category-card" style="cursor: default;">
-                    <div class="category-icon" style="background: ${cat.color}20; color: ${cat.color};">
-                        <i class="fas ${cat.icon}"></i>
-                    </div>
-                    <h3 class="category-name">${cat.name.en}</h3>
-                    <span class="category-count">${postCount} posts</span>
-                    <div style="margin-top: var(--space-md); font-size: 0.8rem; color: var(--text-muted);">
-                        Slug: /${cat.slug}
-                    </div>
-                </div>
-            `;
+// ==================== 10. CATEGORIES ====================
+const CategoriesAdmin = {
+    async render() {
+        const posts = await AData.getPosts();
+        document.getElementById('categories-grid').innerHTML = CATEGORIES.map(c => {
+            const n = posts.filter(p => p.category === c.id).length;
+            return '<div class="category-card" style="cursor:default;background:var(--card);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:var(--space-xl);text-align:center;">' +
+                '<div style="width:60px;height:60px;margin:0 auto var(--space-md);border-radius:var(--radius-md);background:' + c.color + '20;color:' + c.color + ';display:flex;align-items:center;justify-content:center;font-size:1.5rem;"><i class="fas ' + c.icon + '"></i></div>' +
+                '<h3 style="margin-bottom:4px;">' + c.name.en + '</h3><span style="color:var(--text-muted);font-size:.85rem;">' + n + ' posts · /' + c.slug + '</span></div>';
         }).join('');
     }
 };
 
-// ==================== 11. AFFILIATE MANAGER ====================
-const AffiliateManager = {
-    render() {
-        const links = AdminData.getAffiliateLinks();
+// ==================== 11. AFFILIATE ====================
+const AffiliateAdmin = {
+    init() {
+        document.getElementById('save-aff-btn')?.addEventListener('click', () => this.save());
+    },
+    
+    async save() {
+        const name = document.getElementById('aff-name').value.trim();
+        const url = document.getElementById('aff-url').value.trim();
+        if (!name || !url) { AUtils.toast('Name and URL required', 'error'); return; }
+        const data = {
+            id: AUtils.id(),
+            name: name,
+            url: url,
+            icon: document.getElementById('aff-icon').value.trim() || 'fa-tag',
+            color: document.getElementById('aff-color').value || '#5B9FFF',
+            rating: parseFloat(document.getElementById('aff-rating').value) || 5,
+            description: document.getElementById('aff-desc').value.trim(),
+            clicks: 0,
+            active: true
+        };
+        try { await AData.saveAff(data); AUtils.toast('Offer saved!', 'success'); this.render(); } catch (e) { AUtils.toast('Save failed', 'error'); }
+    },
+    
+    async render() {
+        const list = await AData.getAffiliate();
         const tbody = document.getElementById('affiliate-table-body');
-        
-        tbody.innerHTML = links.map(link => `
-            <tr>
-                <td style="font-weight: 600;">${AdminUtils.escapeHtml(link.name)}</td>
-                <td>
-                    <a href="${link.url}" target="_blank" style="color: var(--neon);">
-                        ${link.url.length > 40 ? link.url.substring(0, 40) + '...' : link.url}
-                    </a>
-                </td>
-                <td>${link.clicks || 0}</td>
-                <td>
-                    <span class="status-badge ${link.active ? 'status-active' : 'status-archived'}">
-                        ${link.active ? 'Active' : 'Inactive'}
-                    </span>
-                </td>
-                <td>
-                    <button class="action-btn view" onclick="window.open('${link.url}', '_blank')" title="Visit">
-                        <i class="fas fa-external-link-alt"></i>
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-    }
-};
-
-// ==================== 12. ANALYTICS ====================
-const Analytics = {
-    render() {
-        const posts = AdminData.getPosts();
-        const comments = AdminData.getComments();
-        const categories = AdminData.getCategories();
-        
-        const totalViews = posts.reduce((sum, p) => sum + (p.views || 0), 0);
-        const avgViews = posts.length > 0 ? Math.round(totalViews / posts.length) : 0;
-        const engagementRate = totalViews > 0 
-            ? Math.round((comments.length / totalViews) * 100) 
-            : 0;
-        
-        document.getElementById('analytics-total-views').textContent = totalViews.toLocaleString();
-        document.getElementById('analytics-avg-views').textContent = avgViews.toLocaleString();
-        document.getElementById('analytics-total-comments').textContent = comments.length;
-        document.getElementById('analytics-engagement').textContent = engagementRate + '%';
-        
-        const categoryAnalytics = categories.map(cat => {
-            const catPosts = posts.filter(p => p.category === cat.id);
-            const catViews = catPosts.reduce((sum, p) => sum + (p.views || 0), 0);
-            return { ...cat, postCount: catPosts.length, totalViews: catViews };
-        }).sort((a, b) => b.totalViews - a.totalViews);
-        
-        const maxViews = Math.max(...categoryAnalytics.map(c => c.totalViews), 1);
-        
-        document.getElementById('category-analytics').innerHTML = categoryAnalytics.map(cat => `
-            <div class="progress-item">
-                <div class="progress-header">
-                    <span class="progress-label" style="color: ${cat.color};">
-                        <i class="fas ${cat.icon}"></i>
-                        ${cat.name.en}
-                    </span>
-                    <span class="progress-value">${cat.totalViews} views</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${(cat.totalViews / maxViews) * 100}%; background: ${cat.color};"></div>
-                </div>
-            </div>
-        `).join('');
-    }
-};
-
-// ==================== 13. SETTINGS ====================
-const Settings = {
-    render() {
-        const settings = AdminStorage.get(ADMIN_CONFIG.storageKeys.settings, {});
-        
-        const siteNameInput = document.getElementById('setting-site-name');
-        const logoUrlInput = document.getElementById('setting-logo-url');
-        const discordInput = document.getElementById('setting-discord-url');
-        const websiteInput = document.getElementById('setting-website-url');
-        
-        if (siteNameInput) siteNameInput.value = settings.siteName || 'Kenven Hub';
-        if (logoUrlInput) logoUrlInput.value = settings.logoUrl || 'https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg';
-        if (discordInput) discordInput.value = settings.discordUrl || 'https://discord.com/channels/1256937655984328714/';
-        if (websiteInput) websiteInput.value = settings.websiteUrl || 'https://yassine.com/';
-        
-        const saveBtn = document.getElementById('save-settings-btn');
-        if (saveBtn) {
-            saveBtn.onclick = () => this.saveSettings();
-        }
-        
-        const clearBtn = document.getElementById('clear-data-btn');
-        if (clearBtn) {
-            clearBtn.onclick = () => this.clearData();
-        }
+        if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No offers yet. Add your first above.</td></tr>'; return; }
+        tbody.innerHTML = list.map(a =>
+            '<tr><td style="font-weight:600;"><i class="fas ' + AUtils.esc(a.icon || 'fa-tag') + '" style="color:' + (a.color || '#5B9FFF') + ';"></i> ' + AUtils.esc(a.name || '') + '</td>' +
+            '<td><a href="' + AUtils.esc(a.url || '#') + '" target="_blank" style="color:var(--neon);">' + (a.url || '').substring(0, 35) + '...</a></td>' +
+            '<td>★ ' + (a.rating || 5) + '</td>' +
+            '<td><span class="status-badge ' + (a.active !== false ? 'status-active' : 'status-inactive') + '">' + (a.active !== false ? 'Active' : 'Inactive') + '</span></td>' +
+            '<td><button class="action-btn delete" onclick="AffiliateAdmin.del(\'' + a.id + '\')"><i class="fas fa-trash"></i></button></td></tr>'
+        ).join('');
     },
     
-    saveSettings() {
-        const settings = {
-            siteName: document.getElementById('setting-site-name').value,
-            logoUrl: document.getElementById('setting-logo-url').value,
-            discordUrl: document.getElementById('setting-discord-url').value,
-            websiteUrl: document.getElementById('setting-website-url').value
+    async del(id) { if (confirm('Delete this offer?')) { try { await AData.deleteAff(id); AUtils.toast('Deleted', 'success'); this.render(); } catch (e) {} } }
+};
+
+// ==================== 12. COINS ADMIN ====================
+const CoinsAdmin = {
+    init() {
+        document.getElementById('save-coin-settings-btn')?.addEventListener('click', () => this.saveSettings());
+        document.getElementById('generate-code-btn')?.addEventListener('click', () => this.genCode());
+    },
+    
+    async render() {
+        const s = await AData.getSettings();
+        const d = { dailyGiftAmount: 1, adRewardAmount: 5, adUrl: 'https://yassine.com/', adWaitSeconds: 30, whatsappNumber: '212631204978', enableDailyGift: true, enableAd: true, enableWhatsapp: true, enableCodes: true, ...(s || {}) };
+        document.getElementById('coin-setting-daily').value = d.dailyGiftAmount;
+        document.getElementById('coin-setting-ad-reward').value = d.adRewardAmount;
+        document.getElementById('coin-setting-ad-wait').value = d.adWaitSeconds;
+        document.getElementById('coin-setting-ad-url').value = d.adUrl;
+        document.getElementById('coin-setting-whatsapp').value = d.whatsappNumber;
+        document.getElementById('coin-enable-daily').checked = d.enableDailyGift;
+        document.getElementById('coin-enable-ad').checked = d.enableAd;
+        document.getElementById('coin-enable-whatsapp').checked = d.enableWhatsapp;
+        document.getElementById('coin-enable-codes').checked = d.enableCodes;
+        
+        this.renderCodes();
+        this.renderWallets();
+    },
+    
+    async saveSettings() {
+        try {
+            await AData.saveSettings({
+                dailyGiftAmount: parseInt(document.getElementById('coin-setting-daily').value) || 1,
+                adRewardAmount: parseInt(document.getElementById('coin-setting-ad-reward').value) || 5,
+                adWaitSeconds: parseInt(document.getElementById('coin-setting-ad-wait').value) || 30,
+                adUrl: document.getElementById('coin-setting-ad-url').value.trim(),
+                whatsappNumber: document.getElementById('coin-setting-whatsapp').value.trim(),
+                enableDailyGift: document.getElementById('coin-enable-daily').checked,
+                enableAd: document.getElementById('coin-enable-ad').checked,
+                enableWhatsapp: document.getElementById('coin-enable-whatsapp').checked,
+                enableCodes: document.getElementById('coin-enable-codes').checked
+            });
+            AUtils.toast('Coin settings saved!', 'success');
+        } catch (e) { AUtils.toast('Save failed', 'error'); }
+    },
+    
+    async genCode() {
+        const amount = parseInt(document.getElementById('code-amount').value) || 10;
+        const maxUses = parseInt(document.getElementById('code-max-uses').value) || 0;
+        let code = (document.getElementById('code-text').value || '').trim().toUpperCase();
+        if (!code) {
+            code = 'KV' + Math.random().toString(36).substr(2, 6).toUpperCase();
+        }
+        try {
+            await AData.saveCode({ code: code, amount: amount, maxUses: maxUses, usedCount: 0, active: true, createdAt: Date.now() });
+            document.getElementById('code-text').value = '';
+            AUtils.toast('Code created: ' + code, 'success');
+            this.renderCodes();
+        } catch (e) { AUtils.toast('Failed', 'error'); }
+    },
+    
+    async renderCodes() {
+        const codes = await AData.getCodes();
+        const tbody = document.getElementById('codes-table-body');
+        if (!codes.length) { tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No codes yet.</td></tr>'; return; }
+        tbody.innerHTML = codes.map(c =>
+            '<tr><td style="font-family:var(--font-mono);color:var(--gold);font-weight:700;">' + AUtils.esc(c.code) + '</td>' +
+            '<td><i class="fas fa-coins" style="color:var(--gold);"></i> ' + c.amount + '</td>' +
+            '<td>' + (c.usedCount || 0) + (c.maxUses > 0 ? ' / ' + c.maxUses : '') + '</td>' +
+            '<td><span class="status-badge ' + (c.active ? 'status-active' : 'status-inactive') + '">' + (c.active ? 'Active' : 'Disabled') + '</span></td>' +
+            '<td><div class="actions-cell">' +
+            '<button class="action-btn edit" onclick="CoinsAdmin.toggleCode(\'' + c.code + '\', ' + !c.active + ')"><i class="fas fa-' + (c.active ? 'ban' : 'check') + '"></i></button>' +
+            '<button class="action-btn delete" onclick="CoinsAdmin.delCode(\'' + c.code + '\')"><i class="fas fa-trash"></i></button>' +
+            '</div></td></tr>'
+        ).join('');
+    },
+    
+    async toggleCode(code, active) { try { await AData.updateCode(code, { active: active }); this.renderCodes(); } catch (e) {} },
+    async delCode(code) { if (confirm('Delete code ' + code + '?')) { try { await AData.deleteCode(code); this.renderCodes(); } catch (e) {} } },
+    
+    async renderWallets() {
+        const wallets = await AData.getWallets();
+        const tbody = document.getElementById('wallets-table-body');
+        if (!wallets.length) { tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No wallets yet.</td></tr>'; return; }
+        tbody.innerHTML = wallets.map(w =>
+            '<tr><td style="font-family:var(--font-mono);">' + AUtils.esc(w.id || '') + '</td>' +
+            '<td style="color:var(--gold);font-weight:700;"><i class="fas fa-coins"></i> ' + (w.balance || 0) + '</td>' +
+            '<td>' + (w.ownerUid ? '<span class="status-badge status-approved">Member</span>' : '<span class="status-badge status-draft">Guest</span>') + '</td>' +
+            '<td><div class="actions-cell">' +
+            '<button class="action-btn approve" onclick="CoinsAdmin.adjust(\'' + w.id + '\', 5)" title="+5"><i class="fas fa-plus"></i></button>' +
+            '<button class="action-btn delete" onclick="CoinsAdmin.adjust(\'' + w.id + '\', -5)" title="-5"><i class="fas fa-minus"></i></button>' +
+            '</div></td></tr>'
+        ).join('');
+    },
+    
+    async adjust(id, delta) { try { await AData.adjustWallet(id, delta); this.renderWallets(); } catch (e) { AUtils.toast('Failed', 'error'); } }
+};
+
+// ==================== 13. ANALYTICS ====================
+const AnalyticsAdmin = {
+    async render() {
+        const [posts, comments, wallets] = await Promise.all([AData.getPosts(), AData.getComments(), AData.getWallets()]);
+        const views = posts.reduce((s, p) => s + (p.views || 0), 0);
+        const coins = wallets.reduce((s, w) => s + (w.balance || 0), 0);
+        document.getElementById('analytics-total-views').textContent = views.toLocaleString();
+        document.getElementById('analytics-avg-views').textContent = posts.length ? Math.round(views / posts.length) : 0;
+        document.getElementById('analytics-total-comments').textContent = comments.length;
+        document.getElementById('analytics-coins').textContent = coins.toLocaleString();
+        
+        const max = Math.max(...CATEGORIES.map(c => posts.filter(p => p.category === c.id).reduce((s, p) => s + (p.views || 0), 0)), 1);
+        document.getElementById('category-analytics').innerHTML = CATEGORIES.map(c => {
+            const v = posts.filter(p => p.category === c.id).reduce((s, p) => s + (p.views || 0), 0);
+            return '<div class="progress-item"><div class="progress-header"><span style="color:' + c.color + '"><i class="fas ' + c.icon + '"></i> ' + c.name.en + '</span><span style="color:var(--text-muted);">' + v + '</span></div>' +
+                '<div class="progress-bar"><div class="progress-fill" style="width:' + (v / max) * 100 + '%;background:' + c.color + ';"></div></div></div>';
+        }).join('');
+    }
+};
+
+// ==================== 14. SETTINGS ====================
+const SettingsAdmin = {
+    async render() {
+        const s = await AData.getSettings();
+        document.getElementById('setting-site-name').value = s?.siteName || 'Kenven Hub';
+        document.getElementById('setting-logo-url').value = s?.logoUrl || 'https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg';
+        document.getElementById('setting-discord-url').value = s?.discordUrl || 'https://discord.com/channels/1256937655984328714/';
+        document.getElementById('setting-website-url').value = s?.websiteUrl || 'https://yassine.com/';
+        
+        document.getElementById('save-settings-btn').onclick = async () => {
+            try {
+                await AData.saveSettings({
+                    siteName: document.getElementById('setting-site-name').value,
+                    logoUrl: document.getElementById('setting-logo-url').value,
+                    discordUrl: document.getElementById('setting-discord-url').value,
+                    websiteUrl: document.getElementById('setting-website-url').value
+                });
+                AUtils.toast('Settings saved!', 'success');
+            } catch (e) { AUtils.toast('Failed', 'error'); }
         };
         
-        AdminStorage.set(ADMIN_CONFIG.storageKeys.settings, settings);
-        AdminUtils.showToast('Settings saved!', 'success');
-    },
-    
-    clearData() {
-        if (AdminUtils.confirm('WARNING: This will delete ALL posts and comments. Are you sure?')) {
-            if (AdminUtils.confirm('This action CANNOT be undone. Continue?')) {
-                AdminStorage.remove(ADMIN_CONFIG.storageKeys.posts);
-                AdminStorage.remove(ADMIN_CONFIG.storageKeys.comments);
-                AdminUtils.showToast('All data cleared', 'success');
-                setTimeout(() => location.reload(), 1500);
-            }
-        }
+        document.getElementById('reload-cache-btn').onclick = () => { AUtils.toast('Reloading...', 'info'); setTimeout(() => location.reload(), 800); };
     }
 };
 
-// ==================== 14. APP INITIALIZATION ====================
+// ==================== 15. INIT ====================
 const AdminApp = {
     init() {
-        console.log('🔐 Kenven Hub Admin Panel initializing...');
+        console.log('🔐 Admin Panel starting...');
         
-        // Initialize auth first
-        AdminAuth.init();
-        
-        // Initialize login form
-        this.initLoginForm();
-        
-        // Initialize navigation
-        AdminNav.init();
-        
-        // Initialize posts manager
-        PostsManager.init();
-        
-        // Render dashboard if authenticated
-        if (AdminAuth.isAuthenticated) {
+        // Session check
+        if (AdminAuth.checkSession()) {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('admin-dashboard').style.display = 'block';
             Dashboard.render();
         }
         
-        // Session timeout checker
+        // Login form
+        document.getElementById('login-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value.trim();
+            const pass = document.getElementById('login-password').value;
+            const err = document.getElementById('login-error');
+            err.style.display = 'none';
+            
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            
+            const res = await AdminAuth.login(email, pass);
+            btn.disabled = false;
+            
+            if (res.success) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('admin-dashboard').style.display = 'block';
+                Dashboard.render();
+                AUtils.toast('Welcome back, Admin!', 'success');
+            } else {
+                err.textContent = res.error || 'Invalid credentials.';
+                err.style.display = 'block';
+            }
+        });
+        
+        ANav.init();
+        Posts.init();
+        AffiliateAdmin.init();
+        CoinsAdmin.init();
+        
+        // Session timeout
         setInterval(() => {
-            const session = AdminStorage.get(ADMIN_CONFIG.storageKeys.adminSession);
-            if (session && !AdminAuth.isSessionValid(session)) {
-                AdminUtils.showToast('Session expired. Please login again.', 'warning');
-                AdminAuth.logout();
+            if (!AdminAuth.checkSession() && document.getElementById('admin-dashboard').style.display !== 'none') {
+                AUtils.toast('Session expired', 'warning');
+                setTimeout(() => location.reload(), 1500);
             }
         }, 60000);
         
-        console.log('✅ Admin Panel initialized!');
-    },
-    
-    initLoginForm() {
-        const loginForm = document.getElementById('login-form');
-        const loginError = document.getElementById('login-error');
-        
-        if (!loginForm) {
-            console.error('Login form not found!');
-            return;
-        }
-        
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const email = document.getElementById('login-email').value.trim();
-            const password = document.getElementById('login-password').value;
-            
-            if (!email || !password) {
-                loginError.style.display = 'block';
-                loginError.textContent = 'Please fill in all fields.';
-                return;
-            }
-            
-            loginError.style.display = 'none';
-            
-            const submitBtn = loginForm.querySelector('button[type="submit"]');
-            const originalContent = submitBtn.innerHTML;
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
-            
-            try {
-                const result = await AdminAuth.login(email, password);
-                
-                if (result.success) {
-                    AdminUtils.showToast('Login successful!', 'success');
-                    AdminAuth.showDashboard();
-                    Dashboard.render();
-                } else {
-                    loginError.style.display = 'block';
-                    loginError.textContent = result.error || 'Invalid credentials.';
-                }
-            } catch (error) {
-                loginError.style.display = 'block';
-                loginError.textContent = 'An error occurred. Please try again.';
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalContent;
-            }
-        });
+        console.log('✅ Admin Panel ready!');
     }
 };
 
-// ==================== 15. START APP ====================
-document.addEventListener('DOMContentLoaded', () => {
-    AdminApp.init();
-});
+document.addEventListener('DOMContentLoaded', () => AdminApp.init());
 
-// Expose functions to global scope for onclick handlers
-window.PostsManager = PostsManager;
-window.CommentsManager = CommentsManager;
-window.AdminUtils = AdminUtils;
-window.AdminAuth = AdminAuth;
-window.Dashboard = Dashboard;
+// Globals for inline handlers
+window.Posts = Posts;
+window.CommentsAdmin = CommentsAdmin;
+window.AffiliateAdmin = AffiliateAdmin;
+window.CoinsAdmin = CoinsAdmin;
