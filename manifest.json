@@ -1,0 +1,54 @@
+{
+    "name": "Kenven Hub - Resources & Tutorials",
+    "short_name": "Kenven Hub",
+    "description": "Your ultimate resource center for apps, tools, tutorials, and exclusive deals. Part of Kenven Service family.",
+    "start_url": "./index.html",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#161616",
+    "theme_color": "#5B9FFF",
+    "lang": "en",
+    "dir": "ltr",
+    "categories": ["education", "productivity", "utilities"],
+    "icons": [
+        {
+            "src": "https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg",
+            "sizes": "192x192",
+            "type": "image/jpeg",
+            "purpose": "any"
+        },
+        {
+            "src": "https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg",
+            "sizes": "512x512",
+            "type": "image/jpeg",
+            "purpose": "any maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "All Posts",
+            "short_name": "Posts",
+            "description": "View all posts",
+            "url": "./index.html#posts",
+            "icons": [
+                {
+                    "src": "https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Deals & Offers",
+            "short_name": "Deals",
+            "description": "View exclusive deals",
+            "url": "./index.html#affiliate",
+            "icons": [
+                {
+                    "src": "https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg",
+                    "sizes": "192x192"
+                }
+            ]
+        }
+    ]
+}
