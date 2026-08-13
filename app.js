@@ -1592,7 +1592,7 @@ const Pages = {
     renderAffiliate(container) {
         const lang = I18n.currentLang;
         
-        const tools = [
+               const tools = [
             { name: 'Hostinger', icon: 'fa-server', color: '#673DE6', rating: 4.8, desc: { en: 'Premium web hosting with free domain and SSL', ar: 'استضافة ويب مميزة مع دومين و SSL مجاني' }, url: 'https://hostinger.com?ref=kenven' },
             { name: 'Cloudways', icon: 'fa-cloud', color: '#2C39BD', rating: 4.7, desc: { en: 'Managed cloud hosting for developers', ar: 'استضافة سحابية مُدارة للمطورين' }, url: 'https://www.cloudways.com/en/?id=2197866' },
             { name: 'Fiverr', icon: 'fa-briefcase', color: '#1DBF73', rating: 4.5, desc: { en: 'Freelance services for your business', ar: 'خدمات فريلانس لأعمالك' }, url: 'https://fiverr.com?ref=kenven' },
