@@ -1,12 +1,10 @@
 /* ================================================================
-   KENVEN HUB - SERVICE WORKER
-   PWA: Offline Support + Caching
+   KENVEN HUB - SERVICE WORKER (v2 - Always Fresh)
    ================================================================ */
 
-const CACHE_VERSION = 'kenven-hub-v1';
+const CACHE_VERSION = 'kenven-hub-v2';
 const CACHE_NAME = `kenven-hub-${CACHE_VERSION}`;
 
-// Core assets to pre-cache on install
 const CORE_ASSETS = [
     './',
     './index.html',
@@ -19,44 +17,24 @@ const CORE_ASSETS = [
 
 // ==================== INSTALL ====================
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing...');
-    
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then((cache) => {
-                console.log('[SW] Pre-caching core assets');
-                return cache.addAll(CORE_ASSETS);
-            })
-            .then(() => {
-                console.log('[SW] Installed successfully');
-                return self.skipWaiting();
-            })
-            .catch((error) => {
-                console.error('[SW] Install failed:', error);
-            })
+            .then((cache) => cache.addAll(CORE_ASSETS))
+            .then(() => self.skipWaiting())
+            .catch((error) => console.error('[SW] Install failed:', error))
     );
 });
 
-// ==================== ACTIVATE ====================
+// ==================== ACTIVATE (يحذف النسخ القديمة) ====================
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activating...');
-    
     event.waitUntil(
         caches.keys()
-            .then((cacheNames) => {
-                return Promise.all(
-                    cacheNames
-                        .filter((name) => name.startsWith('kenven-hub-') && name !== CACHE_NAME)
-                        .map((oldCache) => {
-                            console.log('[SW] Removing old cache:', oldCache);
-                            return caches.delete(oldCache);
-                        })
-                );
-            })
-            .then(() => {
-                console.log('[SW] Activated successfully');
-                return self.clients.claim();
-            })
+            .then((cacheNames) => Promise.all(
+                cacheNames
+                    .filter((name) => name !== CACHE_NAME)
+                    .map((oldCache) => caches.delete(oldCache))
+            ))
+            .then(() => self.clients.claim())
     );
 });
 
@@ -64,65 +42,52 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const request = event.request;
     const url = new URL(request.url);
-    
-    // Only handle GET requests
+
     if (request.method !== 'GET') return;
-    
-    // Skip Firebase and external API requests
-    if (url.hostname.includes('firebase') || 
+
+    // تجاهل خدمات Firebase و Google
+    if (url.hostname.includes('firebase') ||
         url.hostname.includes('googleapis') ||
         url.hostname.includes('gstatic')) {
         return;
     }
-    
-    // Navigation requests: Network first, fallback to cached index.html
-    if (request.mode === 'navigate') {
+
+    // ملفاتنا: الشبكة أولاً (دائماً أحدث نسخة)
+    if (url.origin === self.location.origin) {
         event.respondWith(
             fetch(request)
                 .then((response) => {
-                    const responseClone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => {
-                        cache.put(request, responseClone);
-                    });
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
                     return response;
                 })
-                .catch(() => {
-                    return caches.match('./index.html');
-                })
+                .catch(() =>
+                    caches.match(request).then((cached) => cached || caches.match('./index.html'))
+                )
         );
         return;
     }
-    
-    // Static assets: Cache first, then network (stale-while-revalidate)
+
+    // الملفات الخارجية (خطوط/CDN): التخزين أولاً (للسرعة)
     event.respondWith(
-        caches.match(request)
-            .then((cachedResponse) => {
-                const fetchPromise = fetch(request)
-                    .then((networkResponse) => {
-                        if (networkResponse && networkResponse.status === 200) {
-                            const responseClone = networkResponse.clone();
-                            caches.open(CACHE_NAME).then((cache) => {
-                                cache.put(request, responseClone);
-                            });
-                        }
-                        return networkResponse;
-                    })
-                    .catch(() => cachedResponse);
-                
-                return cachedResponse || fetchPromise;
-            })
+        caches.match(request).then((cached) => {
+            const fetchPromise = fetch(request)
+                .then((networkResponse) => {
+                    if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+                        const clone = networkResponse.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+                    }
+                    return networkResponse;
+                })
+                .catch(() => cached);
+            return cached || fetchPromise;
+        })
     );
 });
 
-// ==================== MESSAGE HANDLING ====================
+// ==================== MESSAGES ====================
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
-    }
-    
-    if (event.data && event.data.type === 'CLEAR_CACHE') {
-        caches.delete(CACHE_NAME).then(() => {
-            console.log('[SW] Cache cleared');
-        });
     }
 });
