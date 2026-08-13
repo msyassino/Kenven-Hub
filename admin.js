@@ -340,9 +340,9 @@ const AdminAuth = {
         document.getElementById('admin-dashboard').style.display = 'none';
     },
     
-    showDashboard() {
+        showDashboard() {
         document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('admin-dashboard').style.display = 'grid';
+        document.getElementById('admin-dashboard').style.display = 'block';
     }
 };
 
