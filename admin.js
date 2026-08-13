@@ -950,6 +950,44 @@ const AdminApp = {
         }, 60000); // Check every minute
         
         console.log('✅ Admin Panel initialized successfully!');
+    },
+    
+    /**
+     * Initialize login form handler
+     */
+    initLoginForm() {
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+        
+        if (loginForm) {
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const email = document.getElementById('login-email').value.trim();
+                const password = document.getElementById('login-password').value;
+                
+                if (!email || !password) {
+                    loginError.style.display = 'block';
+                    loginError.textContent = 'Please fill in all fields.';
+                    return;
+                }
+                
+                // Hide previous error
+                loginError.style.display = 'none';
+                
+                // Attempt login
+                const result = await AdminAuth.login(email, password);
+                
+                if (result.success) {
+                    AdminUtils.showToast('Login successful!', 'success');
+                    AdminAuth.showDashboard();
+                    Dashboard.render();
+                } else {
+                    loginError.style.display = 'block';
+                    loginError.textContent = result.error || 'Invalid credentials. Please try again.';
+                }
+            });
+        }
     }
 };
 
