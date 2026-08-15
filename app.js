@@ -1276,7 +1276,49 @@ const Pages = {
             '<a href="' + CONFIG.site.website + '" target="_blank" rel="noopener noreferrer" class="btn btn-secondary"><i class="fas fa-globe"></i> Kenven Service</a></div></section>';
     },
     
-    notFound(c) {
+    privacy(c) {
+        c.innerHTML = '<div class="legal-page reveal active"><h1><i class="fas fa-shield-alt"></i> ' + (I18n.lang === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy') + '</h1>' +
+        '<p class="legal-updated">' + (I18n.lang === 'ar' ? 'آخر تحديث: أغسطس 2026' : 'Last updated: August 2026') + '</p>' +
+        '<h2>' + (I18n.lang === 'ar' ? '1. البيانات التي نجمعها' : '1. Data We Collect') + '</h2>' +
+        '<p>' + (I18n.lang === 'ar' ? 'نجمع الحد الأدنى من البيانات اللازمة لتشغيل الموقع: بيانات المصادقة (البريد الإلكتروني) عند إنشاء حساب، بيانات المحفظة (الرصيد، الكود الاسترجاعي)، والتعليقات التي تكتبها.' : 'We collect the minimum data necessary to operate the site: authentication data (email) when creating an account, wallet data (balance, recovery code), and comments you write.') + '</p>' +
+        '<h2>' + (I18n.lang === 'ar' ? '2. استخدام البيانات' : '2. How We Use Your Data') + '</h2>' +
+        '<p>' + (I18n.lang === 'ar' ? 'تُستخدم بياناتك حصرياً لتشغيل خدمات الموقع: إدارة محفظتك، عرض تعليقاتك، وتخصيص تجربتك. لا نبيع أو نشارك بياناتك مع أي طرف ثالث.' : 'Your data is used exclusively to operate the site services: managing your wallet, displaying your comments, and personalizing your experience. We do not sell or share your data with any third party.') + '</p>' +
+        '<h2>' + (I18n.lang === 'ar' ? '3. التخزين المحلي' : '3. Local Storage') + '</h2>' +
+        '<p>' + (I18n.lang === 'ar' ? 'نستخدم localStorage لحفظ تفضيلاتك (اللغة، الثيم، التأثيرات) وبيانات محفظتك كمرآة احتياطية. يمكنك مسح هذه البيانات في أي وقت من إعدادات المتصفح.' : 'We use localStorage to save your preferences (language, theme, effects) and wallet data as a backup mirror. You can clear this data at any time from browser settings.') + '</p>' +
+        '<h2>' + (I18n.lang === 'ar' ? '4. حقوقك' : '4. Your Rights') + '</h2>' +
+        '<p>' + (I18n.lang === 'ar' ? 'يحق لك طلب الوصول إلى بياناتك أو تعديلها أو حذفها في أي وقت. تواصل معنا عبر الواتساب أو الديسكورد.' : 'You have the right to request access to, modify, or delete your data at any time. Contact us via WhatsApp or Discord.') + '</p>' +
+        '<h2>' + (I18n.lang === 'ar' ? '5. التواصل' : '5. Contact') + '</h2>' +
+        '<p>' + (I18n.lang === 'ar' ? 'لأي استفسار حول الخصوصية، تواصل معنا عبر:' : 'For any privacy inquiry, contact us via:') + ' <a href="https://wa.me/212631204978" target="_blank">WhatsApp</a> | <a href="' + CONFIG.site.discord + '" target="_blank">Discord</a></p></div>';
+    },
+    terms(c) {
+        c.innerHTML = '<div class="legal-page reveal active"><h1><i class="fas fa-file-contract"></i> ' + (I18n.lang === 'ar' ? 'شروط الاستخدام' : 'Terms of Service') + '</h1>' +
+        '<p class="legal-updated">' + (I18n.lang === 'ar' ? 'آخر تحديث: أغسطس 2026' : 'Last updated: August 2026') + '</p>' +
+        '<h2>' + (I18n.lang === 'ar' ? '1. القبول بالشروط' : '1. Acceptance of Terms') + '</h2>' +
+        '<p>' + (I18n.lang === 'ar' ? 'باستخدامك لموقع Kenven Hub، فإنك توافق على هذه الشروط. إذا لم توافق، يرجى عدم استخدام الموقع.' : 'By using Kenven Hub, you agree to these terms. If you do not agree, please do not use the site.') + '</p>' +
+        '<h2>' + (I18n.lang === 'ar' ? '2. نظام الكوينز' : '2. Coins System') + '</h2>' +
+        '<p>' + (I18n.lang === 'ar' ? 'الكوينز عملة افتراضية داخلية لا قيمة نقدية لها. لا يمكن استبدالها بأموال حقيقية. نحتفظ بحق تعديل أو إيقاف النظام في أي وقت.' : 'Coins are an internal virtual currency with no cash value. They cannot be exchanged for real money. We reserve the right to modify or discontinue the system at any time.') + '</p>' +
+        '<h2>' + (I18n.lang === 'ar' ? '3. المحتوى' : '3. Content') + '</h2>' +
+        '<p>' + (I18n.lang === 'ar' ? 'المحتوى المقدم للأغراض التعليمية والمعلوماتية فقط. نحن غير مسؤولين عن أي أضرار ناتجة عن استخدام المعلومات المنشورة.' : 'Content is provided for educational and informational purposes only. We are not responsible for any damages resulting from the use of published information.') + '</p>' +
+        '<h2>' + (I18n.lang === 'ar' ? '4. روابط الأفلييت' : '4. Affiliate Links') + '</h2>' +
+        '<p>' + (I18n.lang === 'ar' ? 'بعض المنشورات تحتوي على روابط أفلييت. قد نحصل على عمولة عند الشراء من خلالها دون أي تكلفة إضافية عليك.' : 'Some posts contain affiliate links. We may earn a commission when you purchase through them at no extra cost to you.') + '</p>' +
+        '<h2>' + (I18n.lang === 'ar' ? '5. حدود المسؤولية' : '5. Limitation of Liability') + '</h2>' +
+        '<p>' + (I18n.lang === 'ar' ? 'لا يتحمل Kenven Hub أي مسؤولية عن أضرار مباشرة أو غير مباشرة ناتجة عن استخدام الموقع أو المحتوى المنشور فيه.' : 'Kenven Hub shall not be liable for any direct or indirect damages resulting from the use of the site or its published content.') + '</p></div>';
+    },
+    cookiePolicy(c) {
+        c.innerHTML = '<div class="legal-page reveal active"><h1><i class="fas fa-cookie-bite"></i> ' + (I18n.lang === 'ar' ? 'سياسة الكوكيز' : 'Cookie Policy') + '</h1>' +
+        '<p class="legal-updated">' + (I18n.lang === 'ar' ? 'آخر تحديث: أغسطس 2026' : 'Last updated: August 2026') + '</p>' +
+        '<h2>' + (I18n.lang === 'ar' ? 'ما هي الكوكيز؟' : 'What are Cookies?') + '</h2>' +
+        '<p>' + (I18n.lang === 'ar' ? 'الكوكيز ملفات نصية صغيرة تُخزن على جهازك عند زيارة الموقع. نستخدم أيضاً localStorage وهو تقنية مشابهة.' : 'Cookies are small text files stored on your device when visiting the site. We also use localStorage, a similar technology.') + '</p>' +
+        '<h2>' + (I18n.lang === 'ar' ? 'ما الذي نخزنه؟' : 'What do we store?') + '</h2>' +
+        '<ul><li>' + (I18n.lang === 'ar' ? 'تفضيلات اللغة والثيم والتأثيرات' : 'Language, theme, and effects preferences') + '</li>' +
+        '<li>' + (I18n.lang === 'ar' ? 'بيانات المحفظة (الرصيد، الكود الاسترجاعي)' : 'Wallet data (balance, recovery code)') + '</li>' +
+        '<li>' + (I18n.lang === 'ar' ? 'حالة تسجيل الدخول' : 'Login session state') + '</li>' +
+        '<li>' + (I18n.lang === 'ar' ? 'إعجابات التعليقات' : 'Comment likes') + '</li></ul>' +
+        '<h2>' + (I18n.lang === 'ar' ? 'التحكم' : 'Control') + '</h2>' +
+        '<p>' + (I18n.lang === 'ar' ? 'يمكنك مسح كل البيانات المخزنة من إعدادات المتصفح في أي وقت. رفض الكوكيز قد يؤثر على بعض وظائف الموقع مثل حفظ المحفظة.' : 'You can clear all stored data from browser settings at any time. Declining cookies may affect some site functions like wallet saving.') + '</p></div>';
+    },
+   
+   notFound(c) {
         c.innerHTML = '<section style="text-align:center;padding:var(--space-3xl) 0;">' +
             '<h1 style="font-family:var(--font-mono);font-size:5rem;color:var(--neon);">404</h1>' +
             '<p>' + I18n.t('post.notFound') + '</p>' +
@@ -1436,6 +1478,9 @@ const Router = {
         else if (r.startsWith('category/')) Pages.category(c, r.split('/')[1]);
         else if (r === 'affiliate' || r === 'deals') Pages.affiliate(c);
         else if (r === 'about') Pages.about(c);
+        else if (r === 'privacy') Pages.privacy(c);
+        else if (r === 'terms') Pages.terms(c);
+        else if (r === 'cookie-policy') Pages.cookiePolicy(c);
         else Pages.notFound(c);
         Effects.reveal();
     }
@@ -1639,11 +1684,62 @@ const Maintenance = {
     }
 };
 // ==================== 18. APP INIT ====================
+// ==================== COOKIE CONSENT ====================
+const CookieConsent = {
+    key: 'kenven_hub_cookie_consent',
+    init() {
+        const consent = LS.get(this.key);
+        if (consent !== null) return;
+        const banner = document.getElementById('cookie-banner');
+        if (banner) banner.style.display = 'block';
+        document.getElementById('cookie-accept')?.addEventListener('click', () => this.accept());
+        document.getElementById('cookie-decline')?.addEventListener('click', () => this.decline());
+    },
+    accept() {
+        LS.set(this.key, 'accepted');
+        document.getElementById('cookie-banner').style.display = 'none';
+    },
+    decline() {
+        LS.set(this.key, 'declined');
+        document.getElementById('cookie-banner').style.display = 'none';
+    }
+};
+
+// ==================== MAINTENANCE ====================
+const Maintenance = {
+    async check() {
+        if (!FB.ok) return false;
+        try {
+            const doc = await FB.db.collection('settings').doc('site').get();
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.maintenance && data.maintenance.enabled) {
+                    this.show(data.maintenance);
+                    return true;
+                }
+            }
+        } catch (e) {}
+        return false;
+    },
+    show(m) {
+        const msg = m.message || (I18n.lang === 'ar' ? 'الموقع تحت الصيانة. سنعود قريباً!' : 'Site is under maintenance. We will be back soon!');
+        const eta = m.eta ? '<p class="maintenance-eta"><i class="fas fa-clock"></i> ' + Utils.escapeHtml(m.eta) + '</p>' : '';
+        document.body.innerHTML = '<div class="maintenance-screen"><div><div class="maintenance-icon"><i class="fas fa-tools"></i></div>' +
+            '<h1 class="maintenance-title">KENVEN HUB</h1>' +
+            '<p class="maintenance-msg">' + Utils.escapeHtml(msg) + '</p>' + eta + '</div></div>';
+    }
+};
+
+// ==================== APP ====================
 const App = {
     async init() {
         try {
             console.log('🚀 Kenven Hub starting...');
             FB.init();
+            // Maintenance check
+            const isMaintenance = await Maintenance.check();
+            if (isMaintenance) return;
+            CookieConsent.init();
             // Maintenance check
             const isMaintenance = await Maintenance.check();
             if (isMaintenance) return;
