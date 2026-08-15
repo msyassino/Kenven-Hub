@@ -1,6 +1,6 @@
 /* ================================================================
-KENVEN HUB - MAIN APPLICATION (V2 COMPLETE)
-Firestore + Coins (Mirror + Code Rotation) + Legal + Maintenance
+KENVEN HUB - MAIN APPLICATION (ARMORED + ORGANIZED)
+Mirror Storage + Code Rotation + Auth Persistence + CHAT MODULE
 ================================================================ */
 'use strict';
 
@@ -32,8 +32,7 @@ const CONFIG = {
         likedComments: 'kenven_hub_liked_comments',
         commentTimes: 'kenven_hub_comment_times',
         cachePosts: 'kenven_hub_cache_posts',
-        cacheAff: 'kenven_hub_cache_aff',
-        cookieConsent: 'kenven_hub_cookie_consent'
+        cacheAff: 'kenven_hub_cache_aff'
     },
     defaultSettings: {
         dailyGiftAmount: 1,
@@ -45,7 +44,8 @@ const CONFIG = {
         enableAd: true,
         enableWhatsapp: true,
         enableCodes: true,
-        maintenance: { enabled: false, message: '', eta: '' }
+        chatExpiryDays: 3,
+        chatMaxMessages: 200
     }
 };
 
@@ -174,6 +174,7 @@ const I18n = {
         'nav.categories': { en: 'Categories', ar: 'التصنيفات' },
         'nav.deals': { en: 'Deals', ar: 'العروض' },
         'nav.about': { en: 'About', ar: 'حول' },
+        'nav.chat': { en: 'Chat', ar: 'الشات' },
         'hero.badge': { en: '✨ Your Resource Center', ar: '✨ مركز الموارد الخاص بك' },
         'hero.subtitle': {
             en: 'Discover the best apps, tools, tutorials, and exclusive deals.',
@@ -235,6 +236,7 @@ const I18n = {
         'coins.coins': { en: 'Coins', ar: 'كوينز' },
         'coins.guest': { en: 'Guest Wallet', ar: 'محفظة زائر' },
         'coins.member': { en: 'Member Wallet', ar: 'محفظة عضو' },
+        'coins.claimed': { en: 'Coins added!', ar: 'تمت الإضافة!' },
         'coins.dailyDone': { en: 'Already claimed today. Come back tomorrow!', ar: 'تم استلام هدية اليوم. عد غداً!' },
         'coins.adWait': { en: 'Wait', ar: 'انتظر' },
         'coins.adOpen': { en: 'Ad opened! Claiming in', ar: 'الاستلام بعد' },
@@ -262,8 +264,17 @@ const I18n = {
         'auth.login': { en: 'Login', ar: 'دخول' },
         'theme.light': { en: 'Light mode', ar: 'وضع نهاري' },
         'theme.dark': { en: 'Dark mode', ar: 'وضع ليلي' },
-        'maintenance.title': { en: 'UNDER MAINTENANCE', ar: 'تحت الصيانة' },
-        'maintenance.default': { en: "We're upgrading our systems. We'll be back soon!", ar: 'نقوم بترقية أنظمتنا. سنعود قريباً!' }
+        'chat.title': { en: 'Public Chat Room', ar: 'غرفة الشات العامة' },
+        'chat.subtitle': { en: 'Chat with the community', ar: 'تحدث مع المجتمع' },
+        'chat.placeholder': { en: 'Type your message...', ar: 'اكتب رسالتك...' },
+        'chat.send': { en: 'Send', ar: 'إرسال' },
+        'chat.empty': { en: 'No messages yet. Be the first!', ar: 'لا رسائل بعد. كن الأول!' },
+        'chat.clearAll': { en: 'Clear All Messages', ar: 'حذف كل الرسائل' },
+        'chat.clearConfirm': { en: 'Delete ALL chat messages? This cannot be undone.', ar: 'حذف كل رسائل الشات؟ لا يمكن التراجع.' },
+        'chat.cleared': { en: 'All messages deleted', ar: 'تم حذف كل الرسائل' },
+        'chat.tooLong': { en: 'Message too long', ar: 'الرسالة طويلة جداً' },
+        'chat.emptyMsg': { en: 'Message cannot be empty', ar: 'الرسالة لا يمكن أن تكون فارغة' },
+        'chat.admin': { en: 'ADMIN', ar: 'أدمن' }
     },
     init() {
         this.lang = LS.get(CONFIG.keys.lang) || (navigator.language.startsWith('ar') ? 'ar' : 'en');
@@ -1037,7 +1048,215 @@ const Comments = {
     }
 };
 
-// ==================== 14. PAGES ====================
+// ==================== 14. CHAT MODULE (NEW) ====================
+const Chat = {
+    messages: [],
+    expiryDays: 3,
+    maxMessageLength: 100,
+    isAdmin: false,
+    totalWrites: 0,
+    listener: null,
+    
+    async init() {
+        this.expiryDays = Data.settings.chatExpiryDays || 3;
+        await this.checkAdmin();
+        await this.load();
+        this.bindUI();
+        this.startRealtime();
+    },
+    
+    async checkAdmin() {
+        if (!FB.user) { 
+            this.isAdmin = false; 
+            return; 
+        }
+        try {
+            const doc = await FB.db.collection('users').doc(FB.user.uid).get();
+            this.isAdmin = doc.exists && doc.data().role === 'admin';
+        } catch (e) {
+            this.isAdmin = false;
+        }
+    },
+    
+    async load() {
+        if (!FB.ok) return;
+        try {
+            const now = Date.now();
+            const cutoff = now - (this.expiryDays * 24 * 60 * 60 * 1000);
+            const snap = await FB.db.collection('chat')
+                .where('createdAt', '>=', cutoff)
+                .orderBy('createdAt', 'asc')
+                .limit(Data.settings.chatMaxMessages || 200)
+                .get();
+            this.messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (e) {
+            console.warn('Chat load failed:', e);
+        }
+    },
+    
+    startRealtime() {
+        if (!FB.ok || this.listener) return;
+        try {
+            const now = Date.now();
+            const cutoff = now - (this.expiryDays * 24 * 60 * 60 * 1000);
+            this.listener = FB.db.collection('chat')
+                .where('createdAt', '>=', cutoff)
+                .orderBy('createdAt', 'asc')
+                .limit(Data.settings.chatMaxMessages || 200)
+                .onSnapshot(snapshot => {
+                    this.messages = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    this.render();
+                }, err => {
+                    console.warn('Chat realtime failed:', err);
+                });
+        } catch (e) {
+            console.warn('Chat realtime setup failed:', e);
+        }
+    },
+    
+    stopRealtime() {
+        if (this.listener) {
+            this.listener();
+            this.listener = null;
+        }
+    },
+    
+    async send(content, authorName) {
+        content = (content || '').trim();
+        if (!content) {
+            UI.showToast(I18n.t('chat.emptyMsg'), 'error');
+            return;
+        }
+        if (content.length > this.maxMessageLength) {
+            UI.showToast(I18n.t('chat.tooLong') + ` (max ${this.maxMessageLength})`, 'error');
+            return;
+        }
+        
+        const msg = {
+            content: content,
+            authorName: authorName || (FB.user ? (FB.user.displayName || 'Member') : 'Anonymous'),
+            createdAt: Date.now(),
+            isAdmin: this.isAdmin
+        };
+        
+        try {
+            await FB.db.collection('chat').add(msg);
+            this.totalWrites++;
+            UI.showToast('✓', 'success', 1500);
+        } catch (e) {
+            console.error('Chat send failed:', e);
+            UI.showToast(I18n.t('toast.error'), 'error');
+        }
+    },
+    
+    async clearAll() {
+        if (!this.isAdmin) return;
+        if (!confirm(I18n.t('chat.clearConfirm'))) return;
+        
+        try {
+            const snap = await FB.db.collection('chat').get();
+            const batch = FB.db.batch();
+            snap.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+            this.messages = [];
+            this.render();
+            UI.showToast(I18n.t('chat.cleared'), 'success');
+        } catch (e) {
+            console.error('Clear chat failed:', e);
+            UI.showToast(I18n.t('toast.error'), 'error');
+        }
+    },
+    
+    async cleanup() {
+        if (!FB.ok) return;
+        try {
+            const cutoff = Date.now() - (this.expiryDays * 24 * 60 * 60 * 1000);
+            const snap = await FB.db.collection('chat')
+                .where('createdAt', '<', cutoff)
+                .get();
+            
+            if (snap.empty) return;
+            
+            const batch = FB.db.batch();
+            snap.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+            console.log(`Cleaned up ${snap.size} old chat messages`);
+        } catch (e) {
+            console.warn('Chat cleanup failed:', e);
+        }
+    },
+    
+    render() {
+        const list = document.getElementById('chat-messages-list');
+        if (!list) return;
+        
+        if (!this.messages.length) {
+            list.innerHTML = '<div class="chat-empty"><i class="fas fa-comments"></i><p>' + I18n.t('chat.empty') + '</p></div>';
+            return;
+        }
+        
+        list.innerHTML = this.messages.map(m => {
+            const date = new Date(m.createdAt);
+            const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const adminBadge = m.isAdmin ? ' <span class="chat-admin-badge">' + I18n.t('chat.admin') + '</span>' : '';
+            return `
+                <div class="chat-message ${m.isAdmin ? 'chat-admin-msg' : ''}">
+                    <div class="chat-msg-header">
+                        <span class="chat-author">${Utils.escapeHtml(m.authorName)}${adminBadge}</span>
+                        <span class="chat-time">${time}</span>
+                    </div>
+                    <div class="chat-content">${Utils.escapeHtml(m.content)}</div>
+                </div>
+            `;
+        }).join('');
+        
+        list.scrollTop = list.scrollHeight;
+    },
+    
+    bindUI() {
+        const form = document.getElementById('chat-form');
+        const input = document.getElementById('chat-input');
+        const counter = document.getElementById('chat-char-counter');
+        const clearBtn = document.getElementById('chat-clear-btn');
+        
+        if (input) {
+            input.addEventListener('input', () => {
+                const len = input.value.length;
+                if (counter) {
+                    counter.textContent = `${len}/${this.maxMessageLength}`;
+                    counter.className = len > this.maxMessageLength ? 'chat-counter over' : 'chat-counter';
+                }
+            });
+        }
+        
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const content = input.value.trim();
+                if (content && content.length <= this.maxMessageLength) {
+                    this.send(content);
+                    input.value = '';
+                    if (counter) counter.textContent = `0/${this.maxMessageLength}`;
+                }
+            });
+        }
+        
+        if (clearBtn) {
+            clearBtn.style.display = this.isAdmin ? 'inline-flex' : 'none';
+            clearBtn.addEventListener('click', () => this.clearAll());
+        }
+    },
+    
+    getStats() {
+        return {
+            totalMessages: this.messages.length,
+            totalWrites: this.totalWrites,
+            expiryDays: this.expiryDays
+        };
+    }
+};
+
+// ==================== 15. PAGES ====================
 const Pages = {
     lang() { return I18n.lang; },
     postCard(p) {
@@ -1064,7 +1283,8 @@ const Pages = {
             '<h1 class="hero-title">KENVEN HUB</h1>' +
             '<p class="hero-subtitle">' + I18n.t('hero.subtitle') + '</p>' +
             '<div class="hero-actions"><a href="#posts" class="btn btn-primary"><i class="fas fa-rocket"></i> ' + I18n.t('hero.btn.explore') + '</a>' +
-            '<a href="#affiliate" class="btn btn-secondary"><i class="fas fa-tag"></i> ' + I18n.t('hero.btn.deals') + '</a></div></section>' +
+            '<a href="#affiliate" class="btn btn-secondary"><i class="fas fa-tag"></i> ' + I18n.t('hero.btn.deals') + '</a>' +
+            '<a href="#chat" class="btn btn-ghost"><i class="fas fa-comments"></i> ' + I18n.t('nav.chat') + '</a></div></section>' +
             (f ? '<section class="reveal"><div class="section-header"><h2 class="section-title"><i class="fas fa-star"></i> ' + I18n.t('section.featured') + '</h2></div>' + this.featCard(f) + '</section>' : '') +
             '<section class="reveal"><div class="section-header"><h2 class="section-title"><i class="fas fa-fire"></i> ' + I18n.t('section.latest') + '</h2>' +
             '<a href="#posts" class="section-link">' + I18n.t('section.viewAll') + ' <i class="fas fa-arrow-right"></i></a></div>' +
@@ -1134,52 +1354,23 @@ const Pages = {
             '<a href="' + CONFIG.site.discord + '" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-discord"></i> Discord</a>' +
             '<a href="' + CONFIG.site.website + '" target="_blank" rel="noopener noreferrer" class="btn btn-secondary"><i class="fas fa-globe"></i> Kenven Service</a></div></section>';
     },
-    privacy(c) {
-        const L = this.lang();
-        const ar = L === 'ar';
-        c.innerHTML = '<div class="legal-page reveal active"><h1><i class="fas fa-shield-alt"></i> ' + (ar ? 'سياسة الخصوصية' : 'Privacy Policy') + '</h1>' +
-            '<p class="legal-updated">' + (ar ? 'آخر تحديث: أغسطس 2026' : 'Last updated: August 2026') + '</p>' +
-            '<h2>' + (ar ? '1. البيانات التي نجمعها' : '1. Data We Collect') + '</h2>' +
-            '<p>' + (ar ? 'نجمع الحد الأدنى من البيانات اللازمة لتشغيل الموقع: بيانات المصادقة (البريد الإلكتروني) عند إنشاء حساب، بيانات المحفظة (الرصيد، الكود الاسترجاعي)، والتعليقات التي تكتبها.' : 'We collect the minimum data necessary to operate the site: authentication data (email) when creating an account, wallet data (balance, recovery code), and comments you write.') + '</p>' +
-            '<h2>' + (ar ? '2. استخدام البيانات' : '2. How We Use Your Data') + '</h2>' +
-            '<p>' + (ar ? 'تُستخدم بياناتك حصرياً لتشغيل خدمات الموقع: إدارة محفظتك، عرض تعليقاتك، وتخصيص تجربتك. لا نبيع أو نشارك بياناتك مع أي طرف ثالث.' : 'Your data is used exclusively to operate the site services: managing your wallet, displaying your comments, and personalizing your experience. We do not sell or share your data with any third party.') + '</p>' +
-            '<h2>' + (ar ? '3. التخزين المحلي' : '3. Local Storage') + '</h2>' +
-            '<p>' + (ar ? 'نستخدم localStorage لحفظ تفضيلاتك (اللغة، الثيم، التأثيرات) وبيانات محفظتك كمرآة احتياطية. يمكنك مسح هذه البيانات في أي وقت من إعدادات المتصفح.' : 'We use localStorage to save your preferences (language, theme, effects) and wallet data as a backup mirror. You can clear this data at any time from browser settings.') + '</p>' +
-            '<h2>' + (ar ? '4. حقوقك' : '4. Your Rights') + '</h2>' +
-            '<p>' + (ar ? 'يحق لك طلب الوصول إلى بياناتك أو تعديلها أو حذفها في أي وقت. تواصل معنا عبر الواتساب أو الديسكورد.' : 'You have the right to request access to, modify, or delete your data at any time. Contact us via WhatsApp or Discord.') + '</p>' +
-            '<h2>' + (ar ? '5. التواصل' : '5. Contact') + '</h2>' +
-            '<p>' + (ar ? 'لأي استفسار حول الخصوصية، تواصل معنا عبر:' : 'For any privacy inquiry, contact us via:') + ' <a href="https://wa.me/212631204978" target="_blank">WhatsApp</a> | <a href="' + CONFIG.site.discord + '" target="_blank">Discord</a></p></div>';
-    },
-    terms(c) {
-        const L = this.lang();
-        const ar = L === 'ar';
-        c.innerHTML = '<div class="legal-page reveal active"><h1><i class="fas fa-file-contract"></i> ' + (ar ? 'شروط الاستخدام' : 'Terms of Service') + '</h1>' +
-            '<p class="legal-updated">' + (ar ? 'آخر تحديث: أغسطس 2026' : 'Last updated: August 2026') + '</p>' +
-            '<h2>' + (ar ? '1. القبول بالشروط' : '1. Acceptance of Terms') + '</h2>' +
-            '<p>' + (ar ? 'باستخدامك لموقع Kenven Hub، فإنك توافق على هذه الشروط. إذا لم توافق، يرجى عدم استخدام الموقع.' : 'By using Kenven Hub, you agree to these terms. If you do not agree, please do not use the site.') + '</p>' +
-            '<h2>' + (ar ? '2. نظام الكوينز' : '2. Coins System') + '</h2>' +
-            '<p>' + (ar ? 'الكوينز عملة افتراضية داخلية لا قيمة نقدية لها. لا يمكن استبدالها بأموال حقيقية. نحتفظ بحق تعديل أو إيقاف النظام في أي وقت.' : 'Coins are an internal virtual currency with no cash value. They cannot be exchanged for real money. We reserve the right to modify or discontinue the system at any time.') + '</p>' +
-            '<h2>' + (ar ? '3. المحتوى' : '3. Content') + '</h2>' +
-            '<p>' + (ar ? 'المحتوى المقدم للأغراض التعليمية والمعلوماتية فقط. نحن غير مسؤولين عن أي أضرار ناتجة عن استخدام المعلومات المنشورة.' : 'Content is provided for educational and informational purposes only. We are not responsible for any damages resulting from the use of published information.') + '</p>' +
-            '<h2>' + (ar ? '4. روابط الأفلييت' : '4. Affiliate Links') + '</h2>' +
-            '<p>' + (ar ? 'بعض المنشورات تحتوي على روابط أفلييت. قد نحصل على عمولة عند الشراء من خلالها دون أي تكلفة إضافية عليك.' : 'Some posts contain affiliate links. We may earn a commission when you purchase through them at no extra cost to you.') + '</p>' +
-            '<h2>' + (ar ? '5. حدود المسؤولية' : '5. Limitation of Liability') + '</h2>' +
-            '<p>' + (ar ? 'لا يتحمل Kenven Hub أي مسؤولية عن أضرار مباشرة أو غير مباشرة ناتجة عن استخدام الموقع أو المحتوى المنشور فيه.' : 'Kenven Hub shall not be liable for any direct or indirect damages resulting from the use of the site or its published content.') + '</p></div>';
-    },
-    cookiePolicy(c) {
-        const L = this.lang();
-        const ar = L === 'ar';
-        c.innerHTML = '<div class="legal-page reveal active"><h1><i class="fas fa-cookie-bite"></i> ' + (ar ? 'سياسة الكوكيز' : 'Cookie Policy') + '</h1>' +
-            '<p class="legal-updated">' + (ar ? 'آخر تحديث: أغسطس 2026' : 'Last updated: August 2026') + '</p>' +
-            '<h2>' + (ar ? 'ما هي الكوكيز؟' : 'What are Cookies?') + '</h2>' +
-            '<p>' + (ar ? 'الكوكيز ملفات نصية صغيرة تُخزن على جهازك عند زيارة الموقع. نستخدم أيضاً localStorage وهو تقنية مشابهة.' : 'Cookies are small text files stored on your device when visiting the site. We also use localStorage, a similar technology.') + '</p>' +
-            '<h2>' + (ar ? 'ما الذي نخزنه؟' : 'What do we store?') + '</h2>' +
-            '<ul><li>' + (ar ? 'تفضيلات اللغة والثيم والتأثيرات' : 'Language, theme, and effects preferences') + '</li>' +
-            '<li>' + (ar ? 'بيانات المحفظة (الرصيد، الكود الاسترجاعي)' : 'Wallet data (balance, recovery code)') + '</li>' +
-            '<li>' + (ar ? 'حالة تسجيل الدخول' : 'Login session state') + '</li>' +
-            '<li>' + (ar ? 'إعجابات التعليقات' : 'Comment likes') + '</li></ul>' +
-            '<h2>' + (ar ? 'التحكم' : 'Control') + '</h2>' +
-            '<p>' + (ar ? 'يمكنك مسح كل البيانات المخزنة من إعدادات المتصفح في أي وقت. رفض الكوكيز قد يؤثر على بعض وظائف الموقع مثل حفظ المحفظة.' : 'You can clear all stored data from browser settings at any time. Declining cookies may affect some site functions like wallet saving.') + '</p></div>';
+    chat(c) {
+        c.innerHTML = '<section class="chat-page">' +
+            '<div class="section-header"><h1 class="section-title"><i class="fas fa-comments"></i> ' + I18n.t('chat.title') + '</h1>' +
+            '<button id="chat-clear-btn" class="btn btn-danger" style="display:none;"><i class="fas fa-trash"></i> ' + I18n.t('chat.clearAll') + '</button></div>' +
+            '<p style="color:var(--text-secondary);margin-bottom:var(--space-lg);">' + I18n.t('chat.subtitle') + '</p>' +
+            '<div class="chat-container">' +
+            '<div class="chat-messages" id="chat-messages-list"></div>' +
+            '<form class="chat-form" id="chat-form">' +
+            '<div class="chat-input-wrapper">' +
+            '<input type="text" id="chat-input" class="form-input" placeholder="' + I18n.t('chat.placeholder') + '" maxlength="100" autocomplete="off">' +
+            '<span class="chat-counter" id="chat-char-counter">0/100</span>' +
+            '</div>' +
+            '<button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> ' + I18n.t('chat.send') + '</button>' +
+            '</form></div></section>';
+        
+        Chat.render();
+        Chat.bindUI();
     },
     notFound(c) {
         c.innerHTML = '<section style="text-align:center;padding:var(--space-3xl) 0;">' +
@@ -1201,7 +1392,8 @@ const Pages = {
         const heads = [...raw.matchAll(/<h([23])[^>]*>(.*?)<\/h\1>/gi)];
         if (heads.length) {
             toc = '<div class="post-toc reveal"><h3><i class="fas fa-list"></i> ' + I18n.t('post.toc') + '</h3><ul class="toc-list">' +
-                heads.map((h, i) => '<li><a href="#sec-' + i + '">' + h[2].replace(/<[^>]*>/g, '') + '</a></li>').join('') + '</ul></div>';
+                heads.map((h, i) => '<li><a href="#sec-' + i + '">' + h[2].replace(/<[^>]*>/g, '') + '</a></li>').join('') +
+                '</ul></div>';
         }
         let html = raw;
         heads.forEach((h, i) => {
@@ -1234,7 +1426,8 @@ const Pages = {
             const prev = html.split('</p>')[0] + '</p>';
             body = '<div class="paywall-wrapper">' +
                 '<div class="paywall-preview">' + prev + '</div>' +
-                '<div class="paywall-card"><div class="paywall-icon"><i class="fas fa-lock"></i></div>' +
+                '<div class="paywall-card">' +
+                '<div class="paywall-icon"><i class="fas fa-lock"></i></div>' +
                 '<h2 class="paywall-title">' + I18n.t('paywall.title') + '</h2>' +
                 '<p class="paywall-text">' + I18n.t('paywall.text') + '</p>' +
                 '<div class="paywall-price"><i class="fas fa-coins"></i> ' + price + ' <small>' + I18n.t('coins.coins') + '</small></div>' +
@@ -1259,11 +1452,7 @@ const Pages = {
             (Data.related(p).length ? '<section class="reveal"><h2 class="section-title"><i class="fas fa-link"></i> ' + I18n.t('post.related') + '</h2><div class="posts-grid">' + Data.related(p).map(x => this.postCard(x)).join('') + '</div></section>' : '') +
             '<section class="comments-section reveal"><div class="comments-header"><h2 class="section-title"><i class="fas fa-comments"></i> ' + I18n.t('comments.title') + '</h2>' +
             '<div class="comments-sort"><button class="filter-chip active" data-sort="latest">' + I18n.t('comments.sort.latest') + '</button><button class="filter-chip" data-sort="oldest">' + I18n.t('comments.sort.oldest') + '</button><button class="filter-chip" data-sort="liked">' + I18n.t('comments.sort.liked') + '</button></div></div>' +
-            '<form class="comment-form" id="comment-form"><div class="form-group"><input type="text" id="comment-name" class="form-input" placeholder="' + I18n.t('comments.name') + '"></div>' +
-            '<div class="form-group"><input type="email" id="comment-email" class="form-input" placeholder="' + I18n.t('comments.email') + '"></div>' +
-            '<div class="form-group"><textarea id="comment-content" class="form-textarea" placeholder="' + I18n.t('comments.content') + '"></textarea></div>' +
-            '<button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> ' + I18n.t('comments.submit') + '</button></form>' +
-            '<div id="comments-list"></div></section></article>';
+            '<form class="comment-form" id="comment-form"><div class="form-group"><input type="text" id="comment-name" class="form-input" placeholder="' + I18n.t('comments.name') + '"></div><div class="form-group"><input type="email" id="comment-email" class="form-input" placeholder="' + I18n.t('comments.email') + '"></div><div class="form-group"><textarea id="comment-content" class="form-textarea" placeholder="' + I18n.t('comments.content') + '"></textarea></div><button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> ' + I18n.t('comments.submit') + '</button></form><div id="comments-list"></div></section></article>';
         document.getElementById('share-post-btn')?.addEventListener('click', () => UI.openModal('share-modal'));
         document.getElementById('comment-form')?.addEventListener('submit', e => {
             e.preventDefault();
@@ -1293,7 +1482,7 @@ const Pages = {
     }
 };
 
-// ==================== 15. ROUTER ====================
+// ==================== 16. ROUTER ====================
 const Router = {
     route: '',
     init() {
@@ -1312,6 +1501,12 @@ const Router = {
     renderCurrent() {
         const c = document.getElementById('app-container');
         if (!c) return;
+        
+        // Stop chat listener when leaving chat page
+        if (this.route !== 'chat') {
+            Chat.stopRealtime();
+        }
+        
         const r = this.route;
         if (r === 'home' || r === '') Pages.home(c);
         else if (r === 'posts') Pages.allPosts(c);
@@ -1320,15 +1515,13 @@ const Router = {
         else if (r.startsWith('category/')) Pages.category(c, r.split('/')[1]);
         else if (r === 'affiliate' || r === 'deals') Pages.affiliate(c);
         else if (r === 'about') Pages.about(c);
-        else if (r === 'privacy') Pages.privacy(c);
-        else if (r === 'terms') Pages.terms(c);
-        else if (r === 'cookie-policy') Pages.cookiePolicy(c);
+        else if (r === 'chat') Pages.chat(c);
         else Pages.notFound(c);
         Effects.reveal();
     }
 };
 
-// ==================== 16. SEARCH / SHARE / NEWSLETTER ====================
+// ==================== 17. SEARCH / SHARE / NEWSLETTER ====================
 const Search = {
     filter: 'all',
     init() {
@@ -1363,10 +1556,11 @@ const Search = {
         const L = I18n.lang;
         b.innerHTML = r.length
             ? '<div style="color:var(--text-muted);font-size:.85rem;margin-bottom:var(--space-md);">' + r.length + ' ' + I18n.t('search.results') + '</div>' +
-            r.map(p => '<div class="search-result-item" onclick="location.hash=\'post/' + p.slug + '\';UI.closeModal(\'search-modal\');"><img src="' + p.coverImage + '" class="search-result-image" alt="" loading="lazy"><div><div class="search-result-title">' + Utils.escapeHtml(p.title?.[L] || '') + '</div><div class="search-result-excerpt">' + Utils.escapeHtml(Utils.truncate(p.excerpt?.[L] || '')) + '</div></div></div>').join('')
+              r.map(p => '<div class="search-result-item" onclick="location.hash=\'post/' + p.slug + '\';UI.closeModal(\'search-modal\');"><img src="' + p.coverImage + '" class="search-result-image" alt="" loading="lazy"><div><div class="search-result-title">' + Utils.escapeHtml(p.title?.[L] || '') + '</div><div class="search-result-excerpt">' + Utils.escapeHtml(Utils.truncate(p.excerpt?.[L] || '')) + '</div></div></div>').join('')
             : '<div class="search-empty">' + I18n.t('search.noResults') + ' "' + Utils.escapeHtml(q) + '"</div>';
     }
 };
+
 const Share = {
     init() {
         document.getElementById('share-close')?.addEventListener('click', () => UI.closeModal('share-modal'));
@@ -1392,6 +1586,7 @@ const Share = {
         UI.closeModal('share-modal');
     }
 };
+
 const Newsletter = {
     init() {
         document.getElementById('newsletter-form')?.addEventListener('submit', async e => {
@@ -1412,7 +1607,7 @@ const Newsletter = {
     }
 };
 
-// ==================== 17. NAVBAR + COOKIE + MAINTENANCE ====================
+// ==================== 18. NAVBAR ====================
 const Navbar = {
     init() {
         addEventListener('scroll', Utils.debounce(() => {
@@ -1462,65 +1657,56 @@ const Navbar = {
         });
     }
 };
+
+// ==================== 19. COOKIE CONSENT ====================
 const CookieConsent = {
+    key: 'kenven_hub_cookie_consent',
     init() {
-        const consent = LS.get(CONFIG.keys.cookieConsent);
+        const consent = LS.get(this.key);
         if (consent !== null) return;
         const banner = document.getElementById('cookie-banner');
         if (banner) banner.style.display = 'block';
-        document.getElementById('cookie-accept-btn')?.addEventListener('click', () => this.accept());
-        document.getElementById('cookie-decline-btn')?.addEventListener('click', () => this.decline());
+        const acceptBtn = document.getElementById('cookie-accept') || document.getElementById('cookie-accept-btn');
+        const declineBtn = document.getElementById('cookie-decline') || document.getElementById('cookie-decline-btn');
+        acceptBtn?.addEventListener('click', () => this.accept());
+        declineBtn?.addEventListener('click', () => this.decline());
     },
     accept() {
-        LS.set(CONFIG.keys.cookieConsent, 'accepted');
-        const b = document.getElementById('cookie-banner');
-        if (b) b.style.display = 'none';
+        LS.set(this.key, 'accepted');
+        document.getElementById('cookie-banner').style.display = 'none';
     },
     decline() {
-        LS.set(CONFIG.keys.cookieConsent, 'declined');
-        const b = document.getElementById('cookie-banner');
-        if (b) b.style.display = 'none';
-    }
-};
-const Maintenance = {
-    check() {
-        const m = Data.settings.maintenance;
-        if (m && m.enabled) {
-            this.show(m);
-            return true;
-        }
-        return false;
-    },
-    show(m) {
-        const overlay = document.getElementById('maintenance-overlay');
-        if (!overlay) return;
-        overlay.style.display = 'flex';
-        const msgEl = document.getElementById('maintenance-message');
-        if (msgEl) msgEl.textContent = m.message || I18n.t('maintenance.default');
-        const etaWrap = document.getElementById('maintenance-eta');
-        const etaText = document.getElementById('maintenance-eta-text');
-        if (m.eta) {
-            if (etaWrap) etaWrap.style.display = 'inline-flex';
-            if (etaText) etaText.textContent = m.eta;
-        }
-        const part = document.getElementById('maintenance-particles');
-        if (part) {
-            part.innerHTML = '';
-            for (let i = 0; i < 20; i++) {
-                const s = document.createElement('span');
-                s.className = 'maintenance-particle';
-                s.style.left = Math.random() * 100 + '%';
-                s.style.animationDuration = (4 + Math.random() * 6) + 's';
-                s.style.animationDelay = Math.random() * 5 + 's';
-                part.appendChild(s);
-            }
-        }
-        const loader = document.getElementById('loader');
-        if (loader) loader.style.display = 'none';
+        LS.set(this.key, 'declined');
+        document.getElementById('cookie-banner').style.display = 'none';
     }
 };
 
-// ==================== 18. APP INIT ====================
+// ==================== 20. MAINTENANCE CHECK ====================
+const Maintenance = {
+    async check() {
+        if (!FB.ok) return false;
+        try {
+            const doc = await FB.db.collection('settings').doc('site').get();
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.maintenance && data.maintenance.enabled) {
+                    this.show(data.maintenance);
+                    return true;
+                }
+            }
+        } catch (e) {}
+        return false;
+    },
+    show(m) {
+        const msg = m.message || (I18n.lang === 'ar' ? 'الموقع تحت الصيانة. سنعود قريباً!' : 'Site is under maintenance. We will be back soon!');
+        const eta = m.eta ? '<p class="maintenance-eta"><i class="fas fa-clock"></i> ' + Utils.escapeHtml(m.eta) + '</p>' : '';
+        document.body.innerHTML = '<div class="maintenance-screen"><div><div class="maintenance-icon"><i class="fas fa-tools"></i></div>' +
+            '<h1 class="maintenance-title">KENVEN HUB</h1>' +
+            '<p class="maintenance-msg">' + Utils.escapeHtml(msg) + '</p>' + eta + '</div></div>';
+    }
+};
+
+// ==================== 21. APP INIT ====================
 const App = {
     async init() {
         try {
@@ -1530,16 +1716,28 @@ const App = {
             Theme.init();
             Effects.init();
             await Data.load();
-            if (Maintenance.check()) return;
+            const isMaintenance = await Maintenance.check();
+            if (isMaintenance) return;
+            CookieConsent.init();
             await Coins.init();
             UserAuth.init();
             Navbar.init();
             Search.init();
             Share.init();
             Newsletter.init();
-            CookieConsent.init();
             Router.init();
-            if (FB.ok) FB.auth.onAuthStateChanged(u => Coins.onAuthChange(u));
+            
+            // Initialize Chat module
+            await Chat.init();
+            
+            // Run chat cleanup daily
+            Chat.cleanup();
+            
+            if (FB.ok) FB.auth.onAuthStateChanged(async u => {
+                Coins.onAuthChange(u);
+                await Chat.checkAdmin();
+                Chat.bindUI();
+            });
             if ('serviceWorker' in navigator) {
                 addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
             }
@@ -1552,8 +1750,8 @@ const App = {
     }
 };
 
-// Error boundary
 window.addEventListener('error', e => console.warn('Caught:', e.message));
 document.addEventListener('DOMContentLoaded', () => App.init());
 window.UI = UI;
 window.Router = Router;
+window.Chat = Chat;
