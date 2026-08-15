@@ -1,10 +1,8 @@
 /* ================================================================
-   KENVEN HUB - SERVICE WORKER (v2 - Always Fresh)
-   ================================================================ */
-
+KENVEN HUB - SERVICE WORKER (v2 - Always Fresh)
+================================================================ */
 const CACHE_VERSION = 'kenven-hub-v2';
 const CACHE_NAME = `kenven-hub-${CACHE_VERSION}`;
-
 const CORE_ASSETS = [
     './',
     './index.html',
@@ -25,7 +23,7 @@ self.addEventListener('install', (event) => {
     );
 });
 
-// ==================== ACTIVATE (يحذف النسخ القديمة) ====================
+// ==================== ACTIVATE ====================
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys()
@@ -45,14 +43,14 @@ self.addEventListener('fetch', (event) => {
 
     if (request.method !== 'GET') return;
 
-    // تجاهل خدمات Firebase و Google
+    // Skip Firebase and Google services
     if (url.hostname.includes('firebase') ||
         url.hostname.includes('googleapis') ||
         url.hostname.includes('gstatic')) {
         return;
     }
 
-    // ملفاتنا: الشبكة أولاً (دائماً أحدث نسخة)
+    // Our files: Network first (always fresh)
     if (url.origin === self.location.origin) {
         event.respondWith(
             fetch(request)
@@ -68,7 +66,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // الملفات الخارجية (خطوط/CDN): التخزين أولاً (للسرعة)
+    // External files (fonts/CDN): Cache first (for speed)
     event.respondWith(
         caches.match(request).then((cached) => {
             const fetchPromise = fetch(request)
