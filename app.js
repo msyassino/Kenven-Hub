@@ -1593,6 +1593,51 @@ const Navbar = {
     }
 };
 
+// ==================== COOKIE CONSENT ====================
+const CookieConsent = {
+    key: 'kenven_hub_cookie_consent',
+    init() {
+        const consent = LS.get(this.key);
+        if (consent !== null) return;
+        const banner = document.getElementById('cookie-banner');
+        if (banner) banner.style.display = 'block';
+        document.getElementById('cookie-accept')?.addEventListener('click', () => this.accept());
+        document.getElementById('cookie-decline')?.addEventListener('click', () => this.decline());
+    },
+    accept() {
+        LS.set(this.key, 'accepted');
+        document.getElementById('cookie-banner').style.display = 'none';
+    },
+    decline() {
+        LS.set(this.key, 'declined');
+        document.getElementById('cookie-banner').style.display = 'none';
+    }
+};
+
+// ==================== MAINTENANCE CHECK ====================
+const Maintenance = {
+    async check() {
+        if (!FB.ok) return false;
+        try {
+            const doc = await FB.db.collection('settings').doc('site').get();
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.maintenance && data.maintenance.enabled) {
+                    this.show(data.maintenance);
+                    return true;
+                }
+            }
+        } catch (e) {}
+        return false;
+    },
+    show(m) {
+        const msg = m.message || (I18n.lang === 'ar' ? 'الموقع تحت الصيانة. سنعود قريباً!' : 'Site is under maintenance. We will be back soon!');
+        const eta = m.eta ? '<p class="maintenance-eta"><i class="fas fa-clock"></i> ' + Utils.escapeHtml(m.eta) + '</p>' : '';
+        document.body.innerHTML = '<div class="maintenance-screen"><div><div class="maintenance-icon"><i class="fas fa-tools"></i></div>' +
+            '<h1 class="maintenance-title">KENVEN HUB</h1>' +
+            '<p class="maintenance-msg">' + Utils.escapeHtml(msg) + '</p>' + eta + '</div></div>';
+    }
+};
 // ==================== 18. APP INIT ====================
 const App = {
     async init() {
