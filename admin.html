@@ -407,6 +407,22 @@
                     <div class="form-group"><label class="form-label">Website URL</label><input type="url" id="setting-website-url" class="form-input"></div>
                     <button class="btn btn-primary" id="save-settings-btn"><i class="fas fa-save"></i> <span>Save Settings</span></button>
                 </div>
+               <div class="card-box" style="max-width:600px;margin-bottom:var(--space-xl);">
+  <h3><i class="fas fa-tools" style="color:var(--neon-yellow);"></i> Maintenance Mode</h3>
+  <label class="checkbox-label" style="margin-bottom:var(--space-lg);">
+    <input type="checkbox" id="maintenance-enabled">
+    <span>Enable Maintenance Mode</span>
+  </label>
+  <div class="form-group">
+    <label class="form-label">Message</label>
+    <input type="text" id="maintenance-message" class="form-input" placeholder="Site is under maintenance...">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Estimated Time (optional)</label>
+    <input type="text" id="maintenance-eta" class="form-input" placeholder="e.g. 2 hours">
+  </div>
+  <button class="btn btn-primary" id="save-maintenance-btn"><i class="fas fa-save"></i> <span>Save Maintenance</span></button>
+</div>
                 <div class="card-box" style="max-width:600px;border-color:var(--neon-pink);">
                     <h3 style="color:var(--neon-pink);">Danger Zone</h3>
                     <p style="color:var(--text-secondary);font-size:.9rem;">Reload data cache from Firestore (use after adding data).</p>
