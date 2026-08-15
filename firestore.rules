@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+
+    match /posts/{postId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /affiliate_links/{linkId} { allow read: if true; allow write: if isAdmin(); }
+    match /settings/{settingId} { allow read: if true; allow write: if isAdmin(); }
+    match /coupons/{couponId} { allow read: if true; allow write: if isAdmin(); }
+    match /subscribers/{subscriberId} {
+      allow create: if request.resource.data.keys().hasOnly(['email', 'date'])
+        && request.resource.data.email is string;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /users/{uid} {
+      allow get: if isOwner(uid) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(uid)
+        && !('role' in request.resource.data)
+        && !('manualRank' in request.resource.data)
+        && !('videoRewardVip' in request.resource.data);
+      allow update: if isAdmin() || (isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['name', 'avatarUrl', 'preferences', 'bookmarks', 'postsRead', 'updatedAt']));
+      allow delete: if isAdmin();
+    }
+
+    match /comments/{commentId} {
+      allow read: if resource.data.approved == true || isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.userUid == request.auth.uid
+        && request.resource.data.authorEmail == request.auth.token.email
+        && request.resource.data.approved == true
+        && request.resource.data.isAdmin == false;
+      allow update, delete: if isAdmin();
+    }
+    match /chat/{messageId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.userUid == request.auth.uid
+        && request.resource.data.content is string
+        && request.resource.data.content.size() <= 100;
+      allow update, delete: if isAdmin();
+    }
+    match /online_users/{uid} {
+      allow read: if true;
+      allow create, update: if isOwner(uid) && request.resource.data.uid == request.auth.uid;
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+    match /video_reward_submissions/{submissionId} {
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow get: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow list, update, delete: if isAdmin();
+    }
+
+    // Balances, recovery transfers, code redemption and view counters must be
+    // performed by trusted Cloud Functions/Admin SDK, never by browser code.
+    match /wallets/{walletId} { allow read, write: if isAdmin(); }
+    match /coin_codes/{code} { allow read, write: if isAdmin(); }
+    match /coin_transfers/{transferId} { allow read, write: if isAdmin(); }
+    match /analytics/{analyticsId} { allow read, write: if isAdmin(); }
+  }
+}

@@ -179,10 +179,12 @@ const FB = {
             }
         } catch (e) { console.warn('Firebase init failed:', e); this.ok = false; }
     },
-    async waitForAuth() {
-        if (!this.ok) return null;
-        if (this.user !== null) return this.user;
-        return this.userPromise;
+    async waitForAuth(timeout = 4000) {
+        if (!this.ok || this.user !== null) return this.user;
+        return Promise.race([
+            this.userPromise,
+            new Promise(resolve => setTimeout(() => resolve(null), timeout))
+        ]);
     }
 };
 
@@ -856,7 +858,7 @@ const UserAuth = {
                 if (name) await cred.user.updateProfile({ displayName: name });
                 try {
                     await FB.db.collection('users').doc(cred.user.uid).set({
-                        email, name: name || 'User', role: 'user', createdAt: Date.now(),
+                        email, name: name || 'User', createdAt: Date.now(),
                         totalEarned: 0, bookmarks: [], postsRead: 0
                     });
                 } catch (e) {}
@@ -961,18 +963,15 @@ const Comments = {
     },
     async submit(pid, parentId = null) {
         const px = parentId ? '#rf-' + parentId + ' ' : '#comment-form ';
-        const n = document.querySelector(parentId ? px + '.rf-name' : '#comment-name');
-        const e = document.querySelector(parentId ? px + '.rf-email' : '#comment-email');
         const c = document.querySelector(parentId ? px + '.rf-content' : '#comment-content');
-        if (!n || !e || !c) return;
-        let name = n.value.trim();
-        let email = e.value.trim();
-        const content = c.value.trim();
-        const isLoggedIn = FB.user;
-        if (isLoggedIn) {
-            name = FB.user.displayName || FB.user.email.split('@')[0];
-            email = FB.user.email;
+        if (!c) return;
+        if (!FB.user) {
+            UI.openModal('auth-modal');
+            return;
         }
+        let name = FB.user.displayName || FB.user.email.split('@')[0];
+        let email = FB.user.email;
+        const content = c.value.trim();
         if (!name || !content || !Utils.isValidEmail(email)) {
             UI.showToast(I18n.t('comments.fillAll'), 'error');
             return;
@@ -989,9 +988,9 @@ const Comments = {
             userAvatar: FB.user?.photoURL || null,
             userUid: FB.user?.uid || null
         };
-        if (FB.ok) {
-            try { await FB.db.collection('comments').doc(cm.id).set(cm); } catch (e) {}
-        }
+        if (!FB.ok) { UI.showToast(I18n.t('coins.offline'), 'warning'); return; }
+        try { await FB.db.collection('comments').doc(cm.id).set(cm); }
+        catch (e) { UI.showToast(I18n.t('toast.error'), 'error'); return; }
         UI.showToast(I18n.t('comments.success'), 'success');
         const list = await this.load(pid);
         this.render(pid, list);
@@ -1073,12 +1072,14 @@ const Chat = {
         const content = (input.value || '').trim();
         if (!content || content.length > 100) return;
         if (!FB.ok) { UI.showToast(I18n.t('coins.offline'), 'warning'); return; }
-        const name = FB.user ? (FB.user.displayName || FB.user.email.split('@')[0]) : 'Guest';
+        if (!FB.user) { UI.openModal('auth-modal'); return; }
+        const name = FB.user.displayName || FB.user.email.split('@')[0];
         const rank = Coins.getRank();
         try {
             await FB.db.collection('chat').add({
                 content: content,
                 authorName: name,
+                userUid: FB.user.uid,
                 userRank: rank.id,
                 createdAt: Date.now()
             });
@@ -1402,11 +1403,13 @@ const Pages = {
             (Data.related(p).length ? '<section class="reveal"><h2 class="section-title"><i class="fas fa-link"></i> ' + I18n.t('post.related') + '</h2><div class="posts-grid">' + Data.related(p).map(x => this.postCard(x)).join('') + '</div></section>' : '') +
             '<section class="comments-section reveal"><div class="comments-header"><h2 class="section-title"><i class="fas fa-comments"></i> ' + I18n.t('comments.title') + '</h2>' +
             '<div class="comments-sort"><button class="filter-chip active" data-sort="latest">' + I18n.t('comments.sort.latest') + '</button><button class="filter-chip" data-sort="oldest">' + I18n.t('comments.sort.oldest') + '</button><button class="filter-chip" data-sort="liked">' + I18n.t('comments.sort.liked') + '</button></div></div>' +
-            (FB.user ? '' : '<form class="comment-form" id="comment-form"><div class="form-group"><input type="text" id="comment-name" class="form-input" placeholder="' + I18n.t('comments.name') + '"></div><div class="form-group"><input type="email" id="comment-email" class="form-input" placeholder="' + I18n.t('comments.email') + '"></div><div class="form-group"><textarea id="comment-content" class="form-textarea" placeholder="' + I18n.t('comments.content') + '"></textarea></div><button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> ' + I18n.t('comments.submit') + '</button></form>' :
-                '<form class="comment-form" id="comment-form"><div class="form-group"><textarea id="comment-content" class="form-textarea" placeholder="' + I18n.t('comments.content') + '"></textarea></div><button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> ' + I18n.t('comments.submit') + '</button></form>') +
+            (FB.user
+                ? '<form class="comment-form" id="comment-form"><div class="form-group"><textarea id="comment-content" class="form-textarea" placeholder="' + I18n.t('comments.content') + '"></textarea></div><button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> ' + I18n.t('comments.submit') + '</button></form>'
+                : '<div class="comment-form"><button type="button" class="btn btn-primary" id="comment-login-btn"><i class="fas fa-user"></i> ' + I18n.t('profile.login') + '</button></div>') +
             '<div id="comments-list"></div></section></article>';
         document.getElementById('share-post-btn')?.addEventListener('click', () => UI.openModal('share-modal'));
         document.getElementById('comment-form')?.addEventListener('submit', e => { e.preventDefault(); Comments.submit(p.id); });
+        document.getElementById('comment-login-btn')?.addEventListener('click', () => UI.openModal('auth-modal'));
         document.querySelectorAll('.comments-sort .filter-chip').forEach(b => {
             b.onclick = async e => {
                 document.querySelectorAll('.comments-sort .filter-chip').forEach(x => x.classList.remove('active'));
@@ -1676,6 +1679,7 @@ const OnlineCounter = {
 // ==================== 27. APP INIT ====================
 const App = {
     async init() {
+        const loaderFallback = setTimeout(() => UI.hideLoader(), 4000);
         try {
             console.log('🚀 Kenven Hub starting...');
             FB.init();
@@ -1703,10 +1707,12 @@ const App = {
             if ('serviceWorker' in navigator) {
                 addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
             }
+            clearTimeout(loaderFallback);
             setTimeout(() => UI.hideLoader(), 1200);
             console.log('✅ Kenven Hub ready!');
         } catch (e) {
             console.error('Init error:', e);
+            clearTimeout(loaderFallback);
             UI.hideLoader();
         }
     }
