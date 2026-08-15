@@ -1,155 +1,31 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Rewards & Coupons - Kenven Hub</title>
-<meta name="description" content="Claim your exclusive coupons and rewards from Kenven Hub.">
-<meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#161616">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg">
-<link rel="icon" type="image/jpeg" href="https://cdn.phototourl.com/free/2026-08-09-001eb100-a118-4da2-a6fa-edd349bfe20e.jpg">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Cairo:wght@300;400;600;700;900&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
-/* ===== REWARDS PAGE SPECIFIC STYLES ===== */
-.rewards-page{min-height:100vh;display:flex;flex-direction:column}
-.rewards-header{text-align:center;padding:var(--space-3xl) var(--space-lg) var(--space-xl)}
-.rewards-header h1{font-family:var(--font-mono);font-size:clamp(1.8rem,5vw,2.8rem);background:linear-gradient(135deg,var(--gold),var(--gold-dark));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.rewards-subtitle{color:var(--text-secondary);max-width:500px;margin:var(--space-sm) auto 0}
-.rewards-container{max-width:800px;margin:0 auto;padding:0 var(--space-lg) var(--space-3xl)}
-.coupon-card{background:var(--card);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:var(--space-xl);margin-bottom:var(--space-lg);display:flex;align-items:center;gap:var(--space-lg);transition:all var(--transition-normal);position:relative;overflow:hidden}
-.coupon-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gold-dark),var(--gold),var(--gold-dark))}
-.coupon-card:hover{border-color:var(--gold);box-shadow:var(--shadow-gold);transform:translateY(-3px)}
-.coupon-icon{width:60px;height:60px;border-radius:var(--radius-md);background:linear-gradient(135deg,rgba(255,215,0,.15),rgba(255,215,0,.05));display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:var(--gold);flex-shrink:0}
-.coupon-info{flex:1;min-width:0}
-.coupon-title{font-weight:700;font-size:1.1rem;margin-bottom:4px}
-.coupon-desc{font-size:.85rem;color:var(--text-secondary)}
-.coupon-code-box{display:flex;align-items:center;gap:var(--space-sm);flex-shrink:0}
-.coupon-code{font-family:var(--font-mono);font-size:1.1rem;font-weight:700;color:var(--gold);background:var(--bg-deep);border:1px dashed var(--gold);border-radius:var(--radius-md);padding:var(--space-sm) var(--space-lg);letter-spacing:2px}
-.copy-coupon-btn{min-width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);background:var(--gold);color:#161616;font-size:1rem;transition:all var(--transition-fast)}
-.copy-coupon-btn:hover{box-shadow:var(--shadow-gold);transform:scale(1.05)}
-.rewards-empty{text-align:center;padding:var(--space-3xl);color:var(--text-muted)}
-.rewards-empty i{font-size:4rem;margin-bottom:var(--space-lg);color:var(--text-muted)}
-.back-home-link{display:inline-flex;align-items:center;gap:var(--space-sm);color:var(--neon);margin-top:var(--space-xl);transition:color var(--transition-fast)}
-.back-home-link:hover{color:var(--neon-light)}
-.coupon-value-badge{position:absolute;top:var(--space-md);right:var(--space-md);background:var(--gold);color:#161616;font-family:var(--font-mono);font-size:.75rem;font-weight:700;padding:4px 10px;border-radius:var(--radius-full)}
-@media(max-width:600px){
-.coupon-card{flex-direction:column;text-align:center}
-.coupon-code-box{width:100%;justify-content:center}
-.coupon-code{font-size:.9rem;padding:var(--space-sm)}
-}
+.rewards-page{min-height:100vh}.rewards-header{text-align:center;padding:4rem 1rem 2rem}.rewards-header h1{font-family:var(--font-mono);color:var(--gold)}.rewards-subtitle{color:var(--text-secondary)}.rewards-container{max-width:850px;margin:auto;padding:1rem 1rem 4rem}.coupon-card{background:var(--card);border:1px solid var(--glass-border);border-radius:20px;padding:1.4rem;display:flex;align-items:center;gap:1rem;margin-bottom:1rem}.coupon-icon{width:56px;height:56px;display:grid;place-items:center;background:rgba(255,215,0,.1);color:var(--gold);border-radius:14px;font-size:1.3rem;flex:none}.coupon-info{flex:1}.coupon-title{font-weight:700}.coupon-desc{color:var(--text-secondary);font-size:.9rem}.coupon-code-box{display:flex;gap:.5rem;align-items:center}.coupon-code{font-family:var(--font-mono);color:var(--gold);border:1px dashed var(--gold);padding:.65rem .8rem;border-radius:10px;letter-spacing:1px;background:var(--bg-deep)}.copy-coupon-btn{width:40px;height:40px;border:1px solid var(--gold);background:var(--gold);color:#161616;border-radius:10px}.rewards-empty{text-align:center;color:var(--text-muted);padding:4rem 1rem}.back-home-link{display:block;width:max-content;margin:0 auto 4rem;color:var(--neon)}
+@media(max-width:620px){.coupon-card{flex-direction:column;text-align:center}.coupon-code-box{width:100%;justify-content:center}.coupon-info{width:100%}}
 </style>
 </head>
 <body>
-<div class="rewards-page">
-
-<!-- Header -->
-<header class="rewards-header">
-<h1><i class="fas fa-gift"></i> Rewards & Coupons</h1>
-<p class="rewards-subtitle">Claim your exclusive coupons below. Codes are limited — grab yours before they're gone!</p>
-</header>
-
-<!-- Rewards Container -->
-<main class="rewards-container" id="rewards-container">
-<div class="rewards-empty">
-<i class="fas fa-spinner fa-spin"></i>
-<p>Loading coupons...</p>
-</div>
+<main class="rewards-page">
+<header class="rewards-header"><h1><i class="fas fa-gift"></i> المكافآت والكوبونات</h1><p class="rewards-subtitle">الكوبونات التي يتحكم فيها الأدمن تظهر هنا تلقائياً.</p></header>
+<section id="rewards-container" class="rewards-container"><div class="rewards-empty"><i class="fas fa-spinner fa-spin fa-2x"></i><p>جاري تحميل الكوبونات...</p></div></section>
+<a href="index.html" class="back-home-link"><i class="fas fa-arrow-right"></i> العودة إلى Kenven Hub</a>
 </main>
-
-<!-- Back Home -->
-<div style="text-align:center;padding-bottom:var(--space-3xl)">
-<a href="index.html" class="back-home-link"><i class="fas fa-arrow-left"></i> Back to Kenven Hub</a>
-</div>
-
-</div>
-
-<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 'use strict';
-const firebaseConfig = {
-apiKey: "AIzaSyDQ7q03kfdOQAm_B03O47GlC4v8DCru94E",
-authDomain: "kenven-hub.firebaseapp.com",
-projectId: "kenven-hub",
-storageBucket: "kenven-hub.firebasestorage.app",
-messagingSenderId: "181277894032",
-appId: "1:181277894032:web:7f42a19f3bcf3ea3033f15"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-
-const container = document.getElementById('rewards-container');
-
-async function loadCoupons() {
-try {
-const snap = await db.collection('coupons')
-.where('active', '==', true)
-.get();
-const coupons = snap.docs.map(d => d.data()).filter(c => !c.usedUp);
-if (!coupons.length) {
-container.innerHTML = '<div class="rewards-empty"><i class="fas fa-ticket-alt"></i><p>No coupons available right now. Check back soon!</p></div>';
-return;
-}
-container.innerHTML = coupons.map(c => {
-const icon = c.icon || 'fa-ticket-alt';
-const value = c.value ? c.value : '';
-return '<div class="coupon-card">' +
-(value ? '<span class="coupon-value-badge">' + escapeHtml(value) + '</span>' : '') +
-'<div class="coupon-icon"><i class="fas ' + escapeHtml(icon) + '"></i></div>' +
-'<div class="coupon-info"><div class="coupon-title">' + escapeHtml(c.title || 'Coupon') + '</div>' +
-'<div class="coupon-desc">' + escapeHtml(c.description || '') + '</div></div>' +
-'<div class="coupon-code-box">' +
-'<span class="coupon-code">' + escapeHtml(c.code) + '</span>' +
-'<button class="copy-coupon-btn" onclick="copyCode(\'' + escapeHtml(c.code) + '\')" title="Copy Code"><i class="fas fa-copy"></i></button>' +
-'</div></div>';
-}).join('');
-} catch (e) {
-container.innerHTML = '<div class="rewards-empty"><i class="fas fa-exclamation-triangle"></i><p>Failed to load coupons. Please refresh.</p></div>';
-}
-}
-
-function escapeHtml(s) {
-if (typeof s !== 'string') return '';
-const d = document.createElement('div');
-d.textContent = s;
-return d.innerHTML;
-}
-
-function copyCode(code) {
-navigator.clipboard.writeText(code).then(() => {
-showToast('Code copied!');
-}).catch(() => {
-const ta = document.createElement('textarea');
-ta.value = code;
-document.body.appendChild(ta);
-ta.select();
-document.execCommand('copy');
-document.body.removeChild(ta);
-showToast('Code copied!');
-});
-}
-
-function showToast(msg) {
-let t = document.getElementById('reward-toast');
-if (!t) {
-t = document.createElement('div');
-t.id = 'reward-toast';
-t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--gold);color:#161616;padding:12px 24px;border-radius:12px;font-weight:700;z-index:9999;box-shadow:0 0 20px rgba(255,215,0,.4);';
-document.body.appendChild(t);
-}
-t.textContent = msg;
-t.style.opacity = '1';
-setTimeout(() => { t.style.opacity = '0'; }, 2000);
-}
-
-loadCoupons();
+const cfg={apiKey:'AIzaSyDQ7q03kfdOQAm_B03O47GlC4v8DCru94E',authDomain:'kenven-hub.firebaseapp.com',projectId:'kenven-hub',storageBucket:'kenven-hub.firebasestorage.app',messagingSenderId:'181277894032',appId:'1:181277894032:web:7f42a19f3bcf3ea3033f15'};
+firebase.initializeApp(cfg);const db=firebase.firestore();const box=document.getElementById('rewards-container');
+const esc=s=>{const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML};
+async function load(){try{const snap=await db.collection('coupons').where('active','==',true).get();const rows=snap.docs.map(d=>({id:d.id,...d.data()})).filter(c=>c.usedUp!==true);box.innerHTML=rows.length?rows.map(c=>`<article class="coupon-card"><div class="coupon-icon"><i class="fas ${esc(c.icon||'fa-ticket-alt')}"></i></div><div class="coupon-info"><div class="coupon-title">${esc(c.title||'Coupon')}</div><div class="coupon-desc">${esc(c.description||'')}</div></div><div class="coupon-code-box"><span class="coupon-code">${esc(c.code||'')}</span><button class="copy-coupon-btn" data-code="${esc(c.code||'')}"><i class="fas fa-copy"></i></button></div></article>`).join(''):'<div class="rewards-empty"><i class="fas fa-ticket-alt fa-2x"></i><p>لا توجد كوبونات متاحة حالياً.</p></div>';box.querySelectorAll('.copy-coupon-btn').forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(b.dataset.code)}catch(e){const t=document.createElement('textarea');t.value=b.dataset.code;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove()}b.innerHTML='<i class="fas fa-check"></i>';setTimeout(()=>b.innerHTML='<i class="fas fa-copy"></i>',1200)})}catch(e){box.innerHTML='<div class="rewards-empty"><i class="fas fa-triangle-exclamation fa-2x"></i><p>تعذر تحميل الكوبونات.</p></div>'}}load();
 </script>
 </body>
 </html>
