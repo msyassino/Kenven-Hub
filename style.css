@@ -571,3 +571,27 @@ body.effects-disabled::after { animation: none !important; }
     .navbar, .footer, .back-to-top, .cursor-dot, .cursor-ring, .particles-canvas, .scroll-progress, .comments-section, .post-share { display: none !important; }
     body { background: #fff; color: #000; }
 }
+/* ==================== 27. COOKIE BANNER ==================== */
+.cookie-banner{position:fixed;bottom:0;left:0;right:0;z-index:calc(var(--z-modal) + 10);background:var(--surface);border-top:1px solid var(--glass-border);backdrop-filter:blur(20px);padding:var(--space-lg);animation:slide-up .4s ease}
+.cookie-banner-inner{max-width:900px;margin:0 auto;display:flex;align-items:center;gap:var(--space-lg);flex-wrap:wrap}
+.cookie-icon{font-size:1.8rem;color:var(--neon-yellow)}
+.cookie-text{flex:1;min-width:200px;font-size:.9rem;margin:0}
+.cookie-actions{display:flex;align-items:center;gap:var(--space-sm);flex-wrap:wrap}
+.cookie-link{font-size:.85rem;color:var(--neon);text-decoration:underline}
+@keyframes slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
+/* ==================== 28. LEGAL PAGES ==================== */
+.legal-page{max-width:800px;margin:0 auto}
+.legal-page h1{font-size:clamp(1.6rem,4vw,2.2rem);margin-bottom:var(--space-xl);color:var(--neon)}
+.legal-page h2{font-size:1.2rem;margin:var(--space-xl) 0 var(--space-md);color:var(--text-primary);border-bottom:1px solid var(--glass-border);padding-bottom:var(--space-sm)}
+.legal-page p,.legal-page li{color:var(--text-secondary);line-height:1.8;margin-bottom:var(--space-md)}
+.legal-page ul{padding-left:var(--space-xl);list-style:disc}
+[dir="rtl"] .legal-page ul{padding-left:0;padding-right:var(--space-xl)}
+.legal-page .legal-updated{font-size:.85rem;color:var(--text-muted);font-style:italic;margin-bottom:var(--space-xl)}
+
+/* ==================== 29. MAINTENANCE SCREEN ==================== */
+.maintenance-screen{position:fixed;inset:0;z-index:calc(var(--z-loader) + 1);background:var(--bg-deep);display:flex;align-items:center;justify-content:center;text-align:center;padding:var(--space-xl)}
+.maintenance-icon{font-size:4rem;color:var(--neon-yellow);margin-bottom:var(--space-lg);animation:pulse-glow 2s ease-in-out infinite}
+.maintenance-title{font-family:var(--font-mono);font-size:1.8rem;color:var(--neon);margin-bottom:var(--space-md)}
+.maintenance-msg{color:var(--text-secondary);max-width:500px;margin:0 auto var(--space-lg)}
+.maintenance-eta{font-size:.9rem;color:var(--text-muted)}
