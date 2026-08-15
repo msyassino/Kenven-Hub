@@ -901,7 +901,26 @@ const SettingsAdmin = {
             }
         };
         
-        document.getElementById('reload-cache-btn').onclick = () => {
+        // Maintenance Mode
+const maint = s?.maintenance || {};
+document.getElementById('maintenance-enabled').checked = !!maint.enabled;
+document.getElementById('maintenance-message').value = maint.message || '';
+document.getElementById('maintenance-eta').value = maint.eta || '';
+document.getElementById('save-maintenance-btn').onclick = async () => {
+    try {
+        await AData.saveSettings({
+            maintenance: {
+                enabled: document.getElementById('maintenance-enabled').checked,
+                message: document.getElementById('maintenance-message').value.trim(),
+                eta: document.getElementById('maintenance-eta').value.trim()
+            }
+        });
+        AUtils.toast('Maintenance settings saved!', 'success');
+    } catch (e) {
+        AUtils.toast('Failed: ' + e.message, 'error');
+    }
+};
+       document.getElementById('reload-cache-btn').onclick = () => {
             AUtils.toast('Reloading...', 'info');
             setTimeout(() => location.reload(), 800);
         };
