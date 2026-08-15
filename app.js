@@ -1685,16 +1685,7 @@ const Maintenance = {
 };
 // ==================== 18. APP INIT ====================
 // ==================== COOKIE CONSENT ====================
-const CookieConsent = {
-    key: 'kenven_hub_cookie_consent',
-    init() {
-        const consent = LS.get(this.key);
-        if (consent !== null) return;
-        const banner = document.getElementById('cookie-banner');
-        if (banner) banner.style.display = 'block';
-        document.getElementById('cookie-accept')?.addEventListener('click', () => this.accept());
-        document.getElementById('cookie-decline')?.addEventListener('click', () => this.decline());
-    },
+
     accept() {
         LS.set(this.key, 'accepted');
         document.getElementById('cookie-banner').style.display = 'none';
