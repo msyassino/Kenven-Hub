@@ -1646,8 +1646,10 @@ const CookieConsent = {
         if (consent !== null) return;
         const banner = document.getElementById('cookie-banner');
         if (banner) banner.style.display = 'block';
-        document.getElementById('cookie-accept')?.addEventListener('click', () => this.accept());
-        document.getElementById('cookie-decline')?.addEventListener('click', () => this.decline());
+        const acceptBtn = document.getElementById('cookie-accept') || document.getElementById('cookie-accept-btn');
+        const declineBtn = document.getElementById('cookie-decline') || document.getElementById('cookie-decline-btn');
+        acceptBtn?.addEventListener('click', () => this.accept());
+        declineBtn?.addEventListener('click', () => this.decline());
     },
     accept() {
         LS.set(this.key, 'accepted');
@@ -1684,62 +1686,20 @@ const Maintenance = {
     }
 };
 // ==================== 18. APP INIT ====================
-// ==================== COOKIE CONSENT ====================
-
-    accept() {
-        LS.set(this.key, 'accepted');
-        document.getElementById('cookie-banner').style.display = 'none';
-    },
-    decline() {
-        LS.set(this.key, 'declined');
-        document.getElementById('cookie-banner').style.display = 'none';
-    }
-};
-
-// ==================== MAINTENANCE ====================
-const Maintenance = {
-    async check() {
-        if (!FB.ok) return false;
-        try {
-            const doc = await FB.db.collection('settings').doc('site').get();
-            if (doc.exists) {
-                const data = doc.data();
-                if (data.maintenance && data.maintenance.enabled) {
-                    this.show(data.maintenance);
-                    return true;
-                }
-            }
-        } catch (e) {}
-        return false;
-    },
-    show(m) {
-        const msg = m.message || (I18n.lang === 'ar' ? 'الموقع تحت الصيانة. سنعود قريباً!' : 'Site is under maintenance. We will be back soon!');
-        const eta = m.eta ? '<p class="maintenance-eta"><i class="fas fa-clock"></i> ' + Utils.escapeHtml(m.eta) + '</p>' : '';
-        document.body.innerHTML = '<div class="maintenance-screen"><div><div class="maintenance-icon"><i class="fas fa-tools"></i></div>' +
-            '<h1 class="maintenance-title">KENVEN HUB</h1>' +
-            '<p class="maintenance-msg">' + Utils.escapeHtml(msg) + '</p>' + eta + '</div></div>';
-    }
-};
-
 // ==================== APP ====================
 const App = {
     async init() {
         try {
             console.log('🚀 Kenven Hub starting...');
             FB.init();
-            // Maintenance check
-            const isMaintenance = await Maintenance.check();
-            if (isMaintenance) return;
-            CookieConsent.init();
-            // Maintenance check
-            const isMaintenance = await Maintenance.check();
-            if (isMaintenance) return;
-            CookieConsent.init();
-            FB.init();
             I18n.init();
             Theme.init();
             Effects.init();
             await Data.load();
+            // Maintenance check BEFORE proceeding
+            const isMaintenance = await Maintenance.check();
+            if (isMaintenance) return;
+            CookieConsent.init();
             await Coins.init();
             UserAuth.init();
             Navbar.init();
@@ -1747,14 +1707,14 @@ const App = {
             Share.init();
             Newsletter.init();
             Router.init();
-            
+
             // Sync wallet on auth changes
             if (FB.ok) FB.auth.onAuthStateChanged(u => Coins.onAuthChange(u));
-            
+
             if ('serviceWorker' in navigator) {
                 addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
             }
-            
+
             setTimeout(() => UI.hideLoader(), 1200);
             console.log('✅ Kenven Hub ready!');
         } catch (e) {
