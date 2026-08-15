@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
 Disallow: /admin.html
-Sitemap: https://msyassino.github.io/kenven-hub/sitemap.xml
+
+Sitemap: msyassino.github.io/kenven-hub/sitemap.xml
