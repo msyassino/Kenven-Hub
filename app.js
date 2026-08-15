@@ -1,7 +1,7 @@
 /* ================================================================
-KENVEN HUB - MAIN APPLICATION (ARMORED + ORGANIZED)
-Mirror Storage + Code Rotation + Auth Persistence + CHAT MODULE
-================================================================ */
+   KENVEN HUB - MAIN APPLICATION (V2 FULL)
+   Firebase + Coins + Chat + Profiles + Ranks + Reading + Chat
+   ================================================================ */
 'use strict';
 
 // ==================== 1. CONFIGURATION ====================
@@ -32,7 +32,12 @@ const CONFIG = {
         likedComments: 'kenven_hub_liked_comments',
         commentTimes: 'kenven_hub_comment_times',
         cachePosts: 'kenven_hub_cache_posts',
-        cacheAff: 'kenven_hub_cache_aff'
+        cacheAff: 'kenven_hub_cache_aff',
+        bookmarks: 'kenven_hub_bookmarks',
+        readProgress: 'kenven_hub_read_progress',
+        chatSeen: 'kenven_hub_chat_seen',
+        cookieConsent: 'kenven_hub_cookie_consent',
+        achievements: 'kenven_hub_achievements'
     },
     defaultSettings: {
         dailyGiftAmount: 1,
@@ -44,9 +49,18 @@ const CONFIG = {
         enableAd: true,
         enableWhatsapp: true,
         enableCodes: true,
-        chatExpiryDays: 3,
-        chatMaxMessages: 200
-    }
+        maintenance: { enabled: false, message: '', eta: '' },
+        chatDeleteDays: 3,
+        onlineBoost: 0
+    },
+    ranks: [
+        { id: 'bronze', name: { en: 'Bronze', ar: 'برونز' }, minCoins: 0, color: '#CD7F32', icon: 'fa-medal', dailyGift: 1 },
+        { id: 'silver', name: { en: 'Silver', ar: 'فضي' }, minCoins: 50, color: '#C0C0C0', icon: 'fa-medal', dailyGift: 2 },
+        { id: 'gold', name: { en: 'Gold', ar: 'ذهبي' }, minCoins: 150, color: '#FFD700', icon: 'fa-medal', dailyGift: 3 },
+        { id: 'platinum', name: { en: 'Platinum', ar: 'بلاتيني' }, minCoins: 400, color: '#E5E4E2', icon: 'fa-crown', dailyGift: 5 },
+        { id: 'diamond', name: { en: 'Diamond', ar: 'ألماسي' }, minCoins: 800, color: '#B9F2FF', icon: 'fa-gem', dailyGift: 7 },
+        { id: 'vip', name: { en: 'VIP', ar: 'VIP' }, minCoins: 1500, color: '#FF2E63', icon: 'fa-crown', dailyGift: 10 }
+    ]
 };
 
 // ==================== 2. UTILITIES ====================
@@ -114,29 +128,43 @@ const Utils = {
             finally { document.body.removeChild(ta); }
         }
     },
-    todayStr() { return new Date().toDateString(); }
+    todayStr() { return new Date().toDateString(); },
+    timeAgo(ts) {
+        const diff = Date.now() - ts;
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return 'now';
+        if (mins < 60) return mins + 'm';
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return hrs + 'h';
+        return Math.floor(hrs / 24) + 'd';
+    },
+    getRank(totalEarned) {
+        let rank = CONFIG.ranks[0];
+        for (const r of CONFIG.ranks) {
+            if (totalEarned >= r.minCoins) rank = r;
+        }
+        return rank;
+    },
+    embedYoutube(url) {
+        if (!url) return '';
+        let id = '';
+        const m1 = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+        if (m1) id = m1[1];
+        if (!id) return '';
+        return '<div class="youtube-embed"><iframe src="https://www.youtube.com/embed/' + id + '" allowfullscreen loading="lazy"></iframe></div>';
+    }
 };
 
 // ==================== 3. LOCAL STORAGE ====================
 const LS = {
-    get(k, d = null) {
-        try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }
-        catch (e) { return d; }
-    },
-    set(k, v) {
-        try { localStorage.setItem(k, JSON.stringify(v)); }
-        catch (e) { console.warn('LS set failed', e); }
-    },
+    get(k, d = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.warn('LS set failed', e); } },
     remove(k) { localStorage.removeItem(k); }
 };
 
 // ==================== 4. FIREBASE CORE ====================
 const FB = {
-    db: null,
-    auth: null,
-    ok: false,
-    user: null,
-    userPromise: null,
+    db: null, auth: null, ok: false, user: null, userPromise: null,
     init() {
         try {
             if (typeof firebase !== 'undefined') {
@@ -144,19 +172,12 @@ const FB = {
                 this.db = firebase.firestore();
                 this.auth = firebase.auth();
                 this.ok = true;
-                this.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-                    .catch(e => console.warn('Persistence error:', e));
+                this.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.warn('Persistence error:', e));
                 this.userPromise = new Promise(resolve => {
-                    this.auth.onAuthStateChanged(user => {
-                        this.user = user;
-                        resolve(user);
-                    });
+                    this.auth.onAuthStateChanged(user => { this.user = user; resolve(user); });
                 });
             }
-        } catch (e) {
-            console.warn('Firebase init failed:', e);
-            this.ok = false;
-        }
+        } catch (e) { console.warn('Firebase init failed:', e); this.ok = false; }
     },
     async waitForAuth() {
         if (!this.ok) return null;
@@ -176,10 +197,7 @@ const I18n = {
         'nav.about': { en: 'About', ar: 'حول' },
         'nav.chat': { en: 'Chat', ar: 'الشات' },
         'hero.badge': { en: '✨ Your Resource Center', ar: '✨ مركز الموارد الخاص بك' },
-        'hero.subtitle': {
-            en: 'Discover the best apps, tools, tutorials, and exclusive deals.',
-            ar: 'اكتشف أفضل التطبيقات والأدوات والشروحات والعروض الحصرية.'
-        },
+        'hero.subtitle': { en: 'Discover the best apps, tools, tutorials, and exclusive deals. All in one place.', ar: 'اكتشف أفضل التطبيقات والأدوات والشروحات والعروض الحصرية. كل شيء في مكان واحد.' },
         'hero.btn.explore': { en: 'Explore Posts', ar: 'استكشف المنشورات' },
         'hero.btn.deals': { en: 'View Deals', ar: 'عرض العروض' },
         'section.featured': { en: 'Featured Post', ar: 'منشور مميز' },
@@ -194,10 +212,7 @@ const I18n = {
         'post.toc': { en: 'Table of Contents', ar: 'جدول المحتويات' },
         'post.free': { en: 'FREE', ar: 'مجاني' },
         'affiliate.disclosure.title': { en: 'Affiliate Disclosure', ar: 'إفصاح الأفلييت' },
-        'affiliate.disclosure.text': {
-            en: 'This post contains affiliate links. We may earn a commission at no extra cost.',
-            ar: 'يحتوي على روابط أفلييت. قد نحصل على عمولة دون تكلفة إضافية.'
-        },
+        'affiliate.disclosure.text': { en: 'This post contains affiliate links. We may earn a commission at no extra cost.', ar: 'يحتوي على روابط أفلييت. قد نحصل على عمولة دون تكلفة إضافية.' },
         'affiliate.sponsored': { en: 'Sponsored', ar: 'إعلان' },
         'affiliate.visit': { en: 'Visit', ar: 'زيارة' },
         'comments.title': { en: 'Comments', ar: 'التعليقات' },
@@ -224,14 +239,8 @@ const I18n = {
         'btn.readMore': { en: 'Read More', ar: 'اقرأ المزيد' },
         'btn.backHome': { en: 'Back to Home', ar: 'العودة' },
         'categories.posts': { en: 'posts', ar: 'منشور' },
-        'deals.subtitle': {
-            en: 'Exclusive deals on tools and services',
-            ar: 'عروض حصرية على الأدوات والخدمات'
-        },
-        'about.text': {
-            en: 'Kenven Hub is your resource center for apps, tools, tutorials, and deals.',
-            ar: 'Kenven Hub مركزك الشامل للتطبيقات والأدوات والشروحات والعروض.'
-        },
+        'deals.subtitle': { en: 'Exclusive deals on tools and services', ar: 'عروض حصرية على الأدوات والخدمات' },
+        'about.text': { en: 'Kenven Hub is your resource center for apps, tools, tutorials, and deals.', ar: 'Kenven Hub مركزك الشامل للتطبيقات والأدوات والشروحات والعروض.' },
         'empty.posts': { en: 'No posts yet.', ar: 'لا منشورات.' },
         'coins.coins': { en: 'Coins', ar: 'كوينز' },
         'coins.guest': { en: 'Guest Wallet', ar: 'محفظة زائر' },
@@ -264,17 +273,26 @@ const I18n = {
         'auth.login': { en: 'Login', ar: 'دخول' },
         'theme.light': { en: 'Light mode', ar: 'وضع نهاري' },
         'theme.dark': { en: 'Dark mode', ar: 'وضع ليلي' },
-        'chat.title': { en: 'Public Chat Room', ar: 'غرفة الشات العامة' },
-        'chat.subtitle': { en: 'Chat with the community', ar: 'تحدث مع المجتمع' },
+        'chat.title': { en: 'Public Chat', ar: 'الشات العام' },
         'chat.placeholder': { en: 'Type your message...', ar: 'اكتب رسالتك...' },
         'chat.send': { en: 'Send', ar: 'إرسال' },
-        'chat.empty': { en: 'No messages yet. Be the first!', ar: 'لا رسائل بعد. كن الأول!' },
-        'chat.clearAll': { en: 'Clear All Messages', ar: 'حذف كل الرسائل' },
-        'chat.clearConfirm': { en: 'Delete ALL chat messages? This cannot be undone.', ar: 'حذف كل رسائل الشات؟ لا يمكن التراجع.' },
-        'chat.cleared': { en: 'All messages deleted', ar: 'تم حذف كل الرسائل' },
-        'chat.tooLong': { en: 'Message too long', ar: 'الرسالة طويلة جداً' },
-        'chat.emptyMsg': { en: 'Message cannot be empty', ar: 'الرسالة لا يمكن أن تكون فارغة' },
-        'chat.admin': { en: 'ADMIN', ar: 'أدمن' }
+        'chat.empty': { en: 'No messages yet. Say hello!', ar: 'لا رسائل بعد. قل مرحباً!' },
+        'profile.title': { en: 'My Profile', ar: 'ملفي الشخصي' },
+        'profile.login': { en: 'Login to see your profile', ar: 'سجّل الدخول لعرض ملفك' },
+        'profile.postsRead': { en: 'Posts Read', ar: 'منشورات مقروءة' },
+        'profile.comments': { en: 'Comments', ar: 'التعليقات' },
+        'profile.coinsEarned': { en: 'Total Earned', ar: 'إجمالي المكتسب' },
+        'profile.rank': { en: 'Your Rank', ar: 'رتبتك' },
+        'leaderboard.title': { en: 'Leaderboard', ar: 'المتصدرون' },
+        'transfer.title': { en: 'Transfer Coins', ar: 'تحويل الكوينز' },
+        'transfer.to': { en: 'Recipient wallet code', ar: 'كود محفظة المستلم' },
+        'transfer.amount': { en: 'Amount', ar: 'الكمية' },
+        'transfer.send': { en: 'Send', ar: 'أرسل' },
+        'transfer.success': { en: 'Transfer successful!', ar: 'تم التحويل بنجاح!' },
+        'reading.progress': { en: 'Reading progress', ar: 'تقدم القراءة' },
+        'reading.saved': { en: 'Bookmark saved!', ar: 'تم حفظ العلامة!' },
+        'rewards.title': { en: 'Rewards & Coupons', ar: 'المكافآت والكوبونات' },
+        'rewards.empty': { en: 'No coupons available right now.', ar: 'لا كوبونات متاحة حالياً.' }
     },
     init() {
         this.lang = LS.get(CONFIG.keys.lang) || (navigator.language.startsWith('ar') ? 'ar' : 'en');
@@ -332,48 +350,26 @@ const Theme = {
 const UI = {
     hideLoader() {
         const l = document.getElementById('loader');
-        if (l) {
-            l.classList.add('hidden');
-            setTimeout(() => l.style.display = 'none', 600);
-        }
+        if (l) { l.classList.add('hidden'); setTimeout(() => l.style.display = 'none', 600); }
     },
     showToast(msg, type = 'info', dur = 3000) {
         const c = document.getElementById('toast-container');
         if (!c) return;
-        const icons = {
-            success: 'fa-check-circle',
-            error: 'fa-exclamation-circle',
-            warning: 'fa-exclamation-triangle',
-            info: 'fa-info-circle'
-        };
+        const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
         const t = document.createElement('div');
         t.className = 'toast ' + type;
-        t.innerHTML = '<i class="fas ' + icons[type] + ' toast-icon"></i><span class="toast-message">' +
-            Utils.escapeHtml(msg) + '</span>';
+        t.innerHTML = '<i class="fas ' + icons[type] + ' toast-icon"></i><span class="toast-message">' + Utils.escapeHtml(msg) + '</span>';
         c.appendChild(t);
-        setTimeout(() => {
-            t.style.opacity = '0';
-            setTimeout(() => t.remove(), 300);
-        }, dur);
+        setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, dur);
     },
-    openModal(id) {
-        const m = document.getElementById(id);
-        if (m) { m.classList.add('open'); document.body.style.overflow = 'hidden'; }
-    },
-    closeModal(id) {
-        const m = document.getElementById(id);
-        if (m) { m.classList.remove('open'); document.body.style.overflow = ''; }
-    },
-    closeAll() {
-        document.querySelectorAll('.modal.open').forEach(m => this.closeModal(m.id));
-    }
+    openModal(id) { const m = document.getElementById(id); if (m) { m.classList.add('open'); document.body.style.overflow = 'hidden'; } },
+    closeModal(id) { const m = document.getElementById(id); if (m) { m.classList.remove('open'); document.body.style.overflow = ''; } },
+    closeAll() { document.querySelectorAll('.modal.open').forEach(m => this.closeModal(m.id)); }
 };
 
 // ==================== 8. EFFECTS ====================
 const Effects = {
-    enabled: true,
-    raf: null,
-    particles: [],
+    enabled: true, raf: null, particles: [],
     init() {
         this.enabled = LS.get(CONFIG.keys.effects, true) !== false;
         this.apply();
@@ -382,13 +378,8 @@ const Effects = {
     apply() {
         document.body.classList.toggle('effects-disabled', !this.enabled);
         document.getElementById('effects-toggle')?.classList.toggle('active', this.enabled);
-        if (this.enabled) {
-            this.initCursor();
-            this.initParticles();
-        } else {
-            this.stopParticles();
-            document.body.style.cursor = '';
-        }
+        if (this.enabled) { this.initCursor(); this.initParticles(); }
+        else { this.stopParticles(); document.body.style.cursor = ''; }
     },
     toggle() {
         this.enabled = !this.enabled;
@@ -396,15 +387,12 @@ const Effects = {
         this.apply();
     },
     initCursor() {
-        const d = document.getElementById('cursor-dot');
-        const r = document.getElementById('cursor-ring');
+        const d = document.getElementById('cursor-dot'), r = document.getElementById('cursor-ring');
         if (!d || !r || !matchMedia('(hover: hover)').matches) return;
         document.body.style.cursor = 'none';
         document.addEventListener('mousemove', (e) => {
-            d.style.left = e.clientX + 'px';
-            d.style.top = e.clientY + 'px';
-            r.style.left = e.clientX + 'px';
-            r.style.top = e.clientY + 'px';
+            d.style.left = e.clientX + 'px'; d.style.top = e.clientY + 'px';
+            r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
         });
         document.addEventListener('mouseover', (e) => {
             r.classList.toggle('hover', !!e.target.closest('a, button, input, textarea, [role="button"]'));
@@ -420,11 +408,8 @@ const Effects = {
         addEventListener('resize', Utils.debounce(resize, 200));
         const n = Math.min(45, Math.floor(innerWidth / 30));
         this.particles = Array.from({ length: n }, () => ({
-            x: Math.random() * c.width,
-            y: Math.random() * c.height,
-            s: Math.random() * 2 + 1,
-            vx: (Math.random() - .5) * .4,
-            vy: (Math.random() - .5) * .4,
+            x: Math.random() * c.width, y: Math.random() * c.height,
+            s: Math.random() * 2 + 1, vx: (Math.random() - .5) * .4, vy: (Math.random() - .5) * .4,
             o: Math.random() * .4 + .15
         }));
         const draw = () => {
@@ -433,26 +418,19 @@ const Effects = {
             const rgb = document.body.classList.contains('light-theme') ? '46,123,255' : '91,159,255';
             this.particles.forEach(p => {
                 p.x += p.vx; p.y += p.vy;
-                if (p.x < 0) p.x = c.width;
-                if (p.x > c.width) p.x = 0;
-                if (p.y < 0) p.y = c.height;
-                if (p.y > c.height) p.y = 0;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.s, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(' + rgb + ',' + p.o + ')';
-                ctx.fill();
+                if (p.x < 0) p.x = c.width; if (p.x > c.width) p.x = 0;
+                if (p.y < 0) p.y = c.height; if (p.y > c.height) p.y = 0;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(' + rgb + ',' + p.o + ')'; ctx.fill();
             });
             for (let i = 0; i < this.particles.length; i++) {
                 for (let j = i + 1; j < this.particles.length; j++) {
                     const a = this.particles[i], b = this.particles[j];
                     const d = Math.hypot(a.x - b.x, a.y - b.y);
                     if (d < 100) {
-                        ctx.beginPath();
-                        ctx.moveTo(a.x, a.y);
-                        ctx.lineTo(b.x, b.y);
+                        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
                         ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.1 * (1 - d / 100)) + ')';
-                        ctx.lineWidth = .5;
-                        ctx.stroke();
+                        ctx.lineWidth = .5; ctx.stroke();
                     }
                 }
             }
@@ -460,9 +438,7 @@ const Effects = {
         };
         draw();
     },
-    stopParticles() {
-        if (this.raf) { cancelAnimationFrame(this.raf); this.raf = null; }
-    },
+    stopParticles() { if (this.raf) { cancelAnimationFrame(this.raf); this.raf = null; } },
     initScroll() {
         const bar = document.querySelector('.scroll-progress-bar');
         const btn = document.getElementById('back-to-top');
@@ -511,9 +487,7 @@ const Data = {
                 LS.set(CONFIG.keys.cachePosts, this.posts);
                 LS.set(CONFIG.keys.cacheAff, this.affiliate);
                 return;
-            } catch (e) {
-                console.warn('Firestore load failed, using cache:', e);
-            }
+            } catch (e) { console.warn('Firestore load failed, using cache:', e); }
         }
         this.posts = LS.get(CONFIG.keys.cachePosts, []);
         this.affiliate = LS.get(CONFIG.keys.cacheAff, []);
@@ -529,19 +503,14 @@ const Data = {
     async addView(pid) {
         this.posts.forEach(p => { if (p.id === pid) p.views = (p.views || 0) + 1; });
         if (FB.ok) {
-            try { await FB.db.collection('posts').doc(pid).update({ views: firebase.firestore.FieldValue.increment(1) }); }
-            catch (e) {}
+            try { await FB.db.collection('posts').doc(pid).update({ views: firebase.firestore.FieldValue.increment(1) }); } catch (e) {}
         }
     },
     search(q, c = 'all') {
         const l = q.toLowerCase();
         return this.published().filter(p => {
             const ok = c === 'all' || p.category === c;
-            const h = [
-                p.title?.en || '', p.title?.ar || '',
-                p.excerpt?.en || '', p.excerpt?.ar || '',
-                (p.tags || []).join(' ')
-            ].join(' ').toLowerCase();
+            const h = [p.title?.en || '', p.title?.ar || '', p.excerpt?.en || '', p.excerpt?.ar || '', (p.tags || []).join(' ')].join(' ').toLowerCase();
             return ok && h.includes(l);
         });
     }
@@ -557,10 +526,7 @@ const Mirror = {
             try {
                 await FB.db.collection('wallets').doc(wallet.id).set(wallet, { merge: true });
                 return { ok: true, source: 'cloud' };
-            } catch (e) {
-                console.warn('Cloud write failed, mirror used:', e);
-                return { ok: false, source: 'mirror', error: e.message };
-            }
+            } catch (e) { console.warn('Cloud write failed, mirror used:', e); return { ok: false, source: 'mirror', error: e.message }; }
         }
         return { ok: false, source: 'mirror' };
     },
@@ -575,9 +541,7 @@ const Mirror = {
                     LS.set(CONFIG.keys.mirror, mirror);
                     return data;
                 }
-            } catch (e) {
-                console.warn('Cloud read failed, using mirror:', e);
-            }
+            } catch (e) { console.warn('Cloud read failed, using mirror:', e); }
         }
         const mirror = LS.get(CONFIG.keys.mirror, {}) || {};
         return mirror[id] || null;
@@ -587,13 +551,8 @@ const Mirror = {
         mirror[wallet.id] = wallet;
         LS.set(CONFIG.keys.mirror, mirror);
         if (FB.ok) {
-            try {
-                await FB.db.collection('wallets').doc(wallet.id).set(wallet);
-                return { ok: true };
-            } catch (e) {
-                console.warn('Cloud create failed:', e);
-                return { ok: false, error: e.message };
-            }
+            try { await FB.db.collection('wallets').doc(wallet.id).set(wallet); return { ok: true }; }
+            catch (e) { console.warn('Cloud create failed:', e); return { ok: false, error: e.message }; }
         }
         return { ok: false };
     },
@@ -602,25 +561,17 @@ const Mirror = {
         mirror[id] = { transferred: true, id: id };
         LS.set(CONFIG.keys.mirror, mirror);
         if (FB.ok) {
-            try {
-                await FB.db.collection('wallets').doc(id).update({
-                    transferred: true, balance: 0, unlockedPosts: [], ownerUid: null
-                });
-            } catch (e) {}
+            try { await FB.db.collection('wallets').doc(id).update({ transferred: true, balance: 0, unlockedPosts: [], ownerUid: null }); } catch (e) {}
         }
     }
 };
 
 // ==================== 11. COINS SYSTEM ====================
 const Coins = {
-    wallet: null,
-    adTimer: null,
+    wallet: null, adTimer: null,
     getMeta() {
         let m = LS.get(CONFIG.keys.walletMeta);
-        if (!m) {
-            m = { id: Utils.genRecoveryCode(), isGuest: true };
-            LS.set(CONFIG.keys.walletMeta, m);
-        }
+        if (!m) { m = { id: Utils.genRecoveryCode(), isGuest: true }; LS.set(CONFIG.keys.walletMeta, m); }
         return m;
     },
     setMeta(m) { LS.set(CONFIG.keys.walletMeta, m); },
@@ -639,8 +590,7 @@ const Coins = {
                 if (w && !w.transferred) {
                     this.wallet = w;
                     this.setMeta({ id: w.id, isGuest: false });
-                    this.bindUI();
-                    this.updateUI();
+                    this.bindUI(); this.updateUI();
                     return;
                 }
             }
@@ -648,28 +598,12 @@ const Coins = {
         const meta = this.getMeta();
         let w = await Mirror.readWallet(meta.id);
         if (!w) {
-            w = {
-                id: meta.id,
-                balance: 0,
-                unlockedPosts: [],
-                recoveryCode: meta.id,
-                ownerUid: FB.user ? FB.user.uid : null,
-                createdAt: Date.now(),
-                transferred: false
-            };
+            w = { id: meta.id, balance: 0, unlockedPosts: [], recoveryCode: meta.id, ownerUid: FB.user ? FB.user.uid : null, createdAt: Date.now(), transferred: false, totalEarned: 0 };
             await Mirror.createWallet(w);
         }
         if (w.transferred) {
             const newId = Utils.genRecoveryCode();
-            w = {
-                id: newId,
-                balance: 0,
-                unlockedPosts: [],
-                recoveryCode: newId,
-                ownerUid: FB.user ? FB.user.uid : null,
-                createdAt: Date.now(),
-                transferred: false
-            };
+            w = { id: newId, balance: 0, unlockedPosts: [], recoveryCode: newId, ownerUid: FB.user ? FB.user.uid : null, createdAt: Date.now(), transferred: false, totalEarned: 0 };
             await Mirror.createWallet(w);
             this.setMeta({ id: newId, isGuest: !FB.user });
             UI.showToast(I18n.t('coins.transferred'), 'warning');
@@ -681,8 +615,7 @@ const Coins = {
             this.setUidMap(FB.user.uid, w.id);
             this.setMeta({ id: w.id, isGuest: false });
         }
-        this.bindUI();
-        this.updateUI();
+        this.bindUI(); this.updateUI();
     },
     async onAuthChange(user) {
         if (!this.wallet) return;
@@ -695,10 +628,7 @@ const Coins = {
                 this.setMeta({ id: this.wallet.id, isGuest: false });
             } else if (map[user.uid] !== this.wallet.id) {
                 const w = await Mirror.readWallet(map[user.uid]);
-                if (w && !w.transferred) {
-                    this.wallet = w;
-                    this.setMeta({ id: w.id, isGuest: false });
-                }
+                if (w && !w.transferred) { this.wallet = w; this.setMeta({ id: w.id, isGuest: false }); }
             }
         }
         this.updateUI();
@@ -710,25 +640,29 @@ const Coins = {
         if (nav) nav.textContent = b;
         if (modal) modal.textContent = b;
         const mode = document.getElementById('wallet-mode-text');
-        if (mode) mode.textContent = this.wallet && this.wallet.ownerUid
-            ? I18n.t('coins.member') : I18n.t('coins.guest');
+        if (mode) mode.textContent = this.wallet && this.wallet.ownerUid ? I18n.t('coins.member') : I18n.t('coins.guest');
         const rc = document.getElementById('recovery-code-display');
         if (rc) rc.textContent = this.wallet ? this.wallet.id : '---';
     },
-    isUnlocked(pid) {
-        return this.wallet && (this.wallet.unlockedPosts || []).includes(pid);
+    isUnlocked(pid) { return this.wallet && (this.wallet.unlockedPosts || []).includes(pid); },
+    getRank() {
+        const total = this.wallet ? (this.wallet.totalEarned || 0) : 0;
+        return Utils.getRank(total);
+    },
+    getDailyGiftAmount() {
+        const rank = this.getRank();
+        return rank.dailyGift || Data.settings.dailyGiftAmount || 1;
     },
     async addCoins(amount) {
         if (!this.wallet) return;
         this.wallet.balance = (this.wallet.balance || 0) + amount;
+        this.wallet.totalEarned = (this.wallet.totalEarned || 0) + amount;
         await Mirror.writeWallet(this.wallet);
         this.updateUI();
+        Achievements.check();
     },
     bindUI() {
-        document.getElementById('coins-btn')?.addEventListener('click', () => {
-            UI.openModal('coins-modal');
-            this.updateUI();
-        });
+        document.getElementById('coins-btn')?.addEventListener('click', () => { UI.openModal('coins-modal'); this.updateUI(); });
         document.getElementById('coins-close')?.addEventListener('click', () => UI.closeModal('coins-modal'));
         document.getElementById('copy-recovery-btn')?.addEventListener('click', async () => {
             if (await Utils.copy(this.wallet.id)) UI.showToast(I18n.t('coins.copied'), 'success');
@@ -747,14 +681,12 @@ const Coins = {
     async dailyGift() {
         if (!Data.settings.enableDailyGift || !this.wallet) return;
         const today = Utils.todayStr();
-        if (this.wallet.lastDailyGift === today) {
-            UI.showToast(I18n.t('coins.dailyDone'), 'warning');
-            return;
-        }
+        if (this.wallet.lastDailyGift === today) { UI.showToast(I18n.t('coins.dailyDone'), 'warning'); return; }
         this.wallet.lastDailyGift = today;
         await Mirror.writeWallet(this.wallet);
-        await this.addCoins(Data.settings.dailyGiftAmount || 1);
-        UI.showToast('+' + (Data.settings.dailyGiftAmount || 1) + ' ' + I18n.t('coins.coins') + ' 🎁', 'success');
+        const amount = this.getDailyGiftAmount();
+        await this.addCoins(amount);
+        UI.showToast('+' + amount + ' ' + I18n.t('coins.coins') + ' 🎁', 'success');
     },
     adEarn() {
         if (!Data.settings.enableAd || this.adTimer) return;
@@ -769,8 +701,7 @@ const Coins = {
             left--;
             if (txt) txt.textContent = I18n.t('coins.adWait') + ': ' + left + I18n.t('coins.adSec');
             if (left <= 0) {
-                clearInterval(this.adTimer);
-                this.adTimer = null;
+                clearInterval(this.adTimer); this.adTimer = null;
                 if (btn) btn.disabled = false;
                 if (txt) txt.textContent = '';
                 await this.addCoins(Data.settings.adRewardAmount || 5);
@@ -788,26 +719,18 @@ const Coins = {
             const snap = await FB.db.collection('coin_codes').doc(code).get();
             if (!snap.exists) { UI.showToast(I18n.t('coins.invalidCode'), 'error'); return; }
             const c = snap.data();
-            if (!c.active || (c.maxUses > 0 && c.usedCount >= c.maxUses)) {
-                UI.showToast(I18n.t('coins.invalidCode'), 'error');
-                return;
-            }
+            if (!c.active || (c.maxUses > 0 && c.usedCount >= c.maxUses)) { UI.showToast(I18n.t('coins.invalidCode'), 'error'); return; }
             await FB.db.collection('coin_codes').doc(code).update({ usedCount: (c.usedCount || 0) + 1 });
             await this.addCoins(c.amount || 0);
             input.value = '';
             UI.showToast('+' + c.amount + ' ' + I18n.t('coins.codeSuccess'), 'success');
-        } catch (e) {
-            UI.showToast(I18n.t('coins.invalidCode'), 'error');
-        }
+        } catch (e) { UI.showToast(I18n.t('coins.invalidCode'), 'error'); }
     },
     async restore() {
         const input = document.getElementById('restore-code-input');
         const code = (input.value || '').trim().toUpperCase();
         if (!code || !this.wallet) return;
-        if (code === this.wallet.id) {
-            UI.showToast(I18n.t('coins.sameWallet'), 'warning');
-            return;
-        }
+        if (code === this.wallet.id) { UI.showToast(I18n.t('coins.sameWallet'), 'warning'); return; }
         if (!FB.ok) { UI.showToast(I18n.t('coins.offline'), 'warning'); return; }
         try {
             const oldSnap = await FB.db.collection('wallets').doc(code).get();
@@ -815,18 +738,15 @@ const Coins = {
             const old = oldSnap.data();
             if (old.transferred) { UI.showToast(I18n.t('coins.restoreFail'), 'error'); return; }
             this.wallet.balance = (this.wallet.balance || 0) + (old.balance || 0);
+            this.wallet.totalEarned = (this.wallet.totalEarned || 0) + (old.totalEarned || 0);
             const merged = [...new Set([...(this.wallet.unlockedPosts || []), ...(old.unlockedPosts || [])])];
             this.wallet.unlockedPosts = merged;
             const newId = Utils.genRecoveryCode();
             const newWallet = {
-                id: newId,
-                balance: this.wallet.balance,
-                unlockedPosts: this.wallet.unlockedPosts,
-                recoveryCode: newId,
-                ownerUid: this.wallet.ownerUid || null,
-                createdAt: Date.now(),
-                transferred: false,
-                lastDailyGift: this.wallet.lastDailyGift || null
+                id: newId, balance: this.wallet.balance, unlockedPosts: this.wallet.unlockedPosts,
+                recoveryCode: newId, ownerUid: this.wallet.ownerUid || null, createdAt: Date.now(),
+                transferred: false, lastDailyGift: this.wallet.lastDailyGift || null,
+                totalEarned: this.wallet.totalEarned || 0
             };
             await Mirror.createWallet(newWallet);
             await Mirror.markTransferred(code);
@@ -856,6 +776,44 @@ const Coins = {
         await Mirror.writeWallet(this.wallet);
         this.updateUI();
         return true;
+    },
+    async transferCoins(toCode, amount) {
+        if (!this.wallet || amount <= 0) return false;
+        if ((this.wallet.balance || 0) < amount) {
+            UI.showToast(I18n.t('coins.notEnough'), 'warning');
+            return false;
+        }
+        if (toCode === this.wallet.id) {
+            UI.showToast(I18n.t('coins.sameWallet'), 'warning');
+            return false;
+        }
+        if (!FB.ok) { UI.showToast(I18n.t('coins.offline'), 'warning'); return false; }
+        try {
+            const targetSnap = await FB.db.collection('wallets').doc(toCode).get();
+            if (!targetSnap.exists) { UI.showToast(I18n.t('coins.invalidCode'), 'error'); return false; }
+            const target = targetSnap.data();
+            if (target.transferred) { UI.showToast(I18n.t('coins.invalidCode'), 'error'); return false; }
+            this.wallet.balance -= amount;
+            await Mirror.writeWallet(this.wallet);
+            await FB.db.collection('wallets').doc(toCode).update({
+                balance: firebase.firestore.FieldValue.increment(amount),
+                totalEarned: firebase.firestore.FieldValue.increment(amount)
+            });
+            if (FB.ok) {
+                try {
+                    await FB.db.collection('coin_transfers').add({
+                        fromWallet: this.wallet.id, toWallet: toCode, amount: amount,
+                        fromUid: this.wallet.ownerUid || null, at: Date.now()
+                    });
+                } catch (e) {}
+            }
+            this.updateUI();
+            return true;
+        } catch (e) {
+            console.error('Transfer error:', e);
+            UI.showToast(I18n.t('toast.error'), 'error');
+            return false;
+        }
     }
 };
 
@@ -866,9 +824,10 @@ const UserAuth = {
         document.getElementById('auth-close')?.addEventListener('click', () => UI.closeModal('auth-modal'));
         document.getElementById('auth-register-tab')?.addEventListener('click', () => this.setMode('register'));
         document.getElementById('auth-login-tab')?.addEventListener('click', () => this.setMode('login'));
-        document.getElementById('auth-form')?.addEventListener('submit', e => {
-            e.preventDefault();
-            this.submit();
+        document.getElementById('auth-form')?.addEventListener('submit', e => { e.preventDefault(); this.submit(); });
+        document.getElementById('profile-btn')?.addEventListener('click', () => {
+            if (FB.user) { UI.openModal('profile-modal'); Profile.render(); }
+            else UI.openModal('auth-modal');
         });
     },
     setMode(m) {
@@ -890,18 +849,15 @@ const UserAuth = {
         const pass = document.getElementById('auth-password').value;
         const name = (document.getElementById('auth-name').value || '').trim();
         const err = document.getElementById('auth-error');
-        if (!FB.ok) {
-            err.textContent = I18n.t('auth.unavailable');
-            err.style.display = 'block';
-            return;
-        }
+        if (!FB.ok) { err.textContent = I18n.t('auth.unavailable'); err.style.display = 'block'; return; }
         try {
             if (this.mode === 'register') {
                 const cred = await FB.auth.createUserWithEmailAndPassword(email, pass);
                 if (name) await cred.user.updateProfile({ displayName: name });
                 try {
                     await FB.db.collection('users').doc(cred.user.uid).set({
-                        email, name: name || 'User', role: 'user', createdAt: Date.now()
+                        email, name: name || 'User', role: 'user', createdAt: Date.now(),
+                        totalEarned: 0, bookmarks: [], postsRead: 0
                     });
                 } catch (e) {}
                 UI.closeModal('auth-modal');
@@ -915,6 +871,12 @@ const UserAuth = {
             err.textContent = I18n.t('auth.error');
             err.style.display = 'block';
         }
+    },
+    async logout() {
+        if (FB.ok) {
+            await FB.auth.signOut();
+            location.reload();
+        }
     }
 };
 
@@ -924,10 +886,7 @@ const Comments = {
     async load(pid) {
         if (FB.ok) {
             try {
-                const s = await FB.db.collection('comments')
-                    .where('postId', '==', pid)
-                    .where('approved', '==', true)
-                    .get();
+                const s = await FB.db.collection('comments').where('postId', '==', pid).where('approved', '==', true).get();
                 return s.docs.map(d => d.data());
             } catch (e) {}
         }
@@ -946,14 +905,14 @@ const Comments = {
     },
     one(c, all, d) {
         const r = all.filter(x => x.parentId === c.id);
+        const rankBadge = c.userRank ? '<span class="rank-badge ' + c.userRank + '">' + c.userRank.toUpperCase() + '</span>' : '';
         return '<div class="comment">' +
             '<div class="comment-card ' + (c.isAdmin ? 'admin-comment' : '') + '">' +
             '<div class="comment-header"><div class="comment-avatar">' +
-            Utils.escapeHtml((c.authorName || '?').charAt(0).toUpperCase()) + '</div>' +
-            '<div><div class="comment-author">' + Utils.escapeHtml(c.authorName || '') +
+            (c.userAvatar ? '<img src="' + Utils.escapeHtml(c.userAvatar) + '" alt="">' : Utils.escapeHtml((c.authorName || '?').charAt(0).toUpperCase())) +
+            '</div><div><div class="comment-author">' + Utils.escapeHtml(c.authorName || '') + rankBadge +
             (c.isAdmin ? ' <span class="badge badge-neon">Admin</span>' : '') +
-            '</div><div class="comment-date">' + Utils.formatDate(c.createdAt, I18n.lang) +
-            '</div></div></div>' +
+            '</div><div class="comment-date">' + Utils.formatDate(c.createdAt, I18n.lang) + '</div></div></div>' +
             '<div class="comment-content">' + Utils.escapeHtml(c.content || '') + '</div>' +
             '<div class="comment-actions">' +
             '<button class="comment-like-btn" data-id="' + c.id + '"><i class="fas fa-heart"></i> <span>' + (c.likes || 0) + '</span></button>' +
@@ -983,8 +942,7 @@ const Comments = {
         l.push(id);
         LS.set(CONFIG.keys.likedComments, l);
         if (FB.ok) {
-            try { await FB.db.collection('comments').doc(id).update({ likes: firebase.firestore.FieldValue.increment(1) }); }
-            catch (e) {}
+            try { await FB.db.collection('comments').doc(id).update({ likes: firebase.firestore.FieldValue.increment(1) }); } catch (e) {}
         }
         const s = btn.querySelector('span');
         if (s) s.textContent = parseInt(s.textContent || 0) + 1;
@@ -998,11 +956,8 @@ const Comments = {
             '<input type="email" class="form-input rf-email" placeholder="' + I18n.t('comments.email') + '" style="margin-bottom:var(--space-sm);">' +
             '<textarea class="form-textarea rf-content" placeholder="' + I18n.t('comments.content') + '" style="margin-bottom:var(--space-sm);"></textarea>' +
             '<button class="btn btn-primary btn-sm rf-submit">' + I18n.t('comments.reply') + '</button></div>';
-        document.querySelector('[data-id="' + id + '"].comment-reply-btn')
-            ?.closest('.comment-card')?.insertAdjacentHTML('beforeend', h);
-        document.querySelector('#rf-' + id + ' .rf-submit').onclick = () => {
-            this.submit(window._currentPostId, id);
-        };
+        document.querySelector('[data-id="' + id + '"].comment-reply-btn')?.closest('.comment-card')?.insertAdjacentHTML('beforeend', h);
+        document.querySelector('#rf-' + id + ' .rf-submit').onclick = () => this.submit(window._currentPostId, id);
     },
     async submit(pid, parentId = null) {
         const px = parentId ? '#rf-' + parentId + ' ' : '#comment-form ';
@@ -1010,35 +965,32 @@ const Comments = {
         const e = document.querySelector(parentId ? px + '.rf-email' : '#comment-email');
         const c = document.querySelector(parentId ? px + '.rf-content' : '#comment-content');
         if (!n || !e || !c) return;
-        const name = n.value.trim();
-        const email = e.value.trim();
+        let name = n.value.trim();
+        let email = e.value.trim();
         const content = c.value.trim();
+        const isLoggedIn = FB.user;
+        if (isLoggedIn) {
+            name = FB.user.displayName || FB.user.email.split('@')[0];
+            email = FB.user.email;
+        }
         if (!name || !content || !Utils.isValidEmail(email)) {
             UI.showToast(I18n.t('comments.fillAll'), 'error');
             return;
         }
         const times = LS.get(CONFIG.keys.commentTimes, []).filter(t => Date.now() - t < 60000);
-        if (times.length >= 5) {
-            UI.showToast(I18n.t('comments.rateLimit'), 'warning');
-            return;
-        }
+        if (times.length >= 5) { UI.showToast(I18n.t('comments.rateLimit'), 'warning'); return; }
         times.push(Date.now());
         LS.set(CONFIG.keys.commentTimes, times);
+        const rank = Coins.getRank();
         const cm = {
-            id: Utils.genId(),
-            postId: pid,
-            authorName: name,
-            authorEmail: email,
-            content,
-            parentId,
-            isAdmin: false,
-            approved: true,
-            likes: 0,
-            createdAt: Date.now()
+            id: Utils.genId(), postId: pid, authorName: name, authorEmail: email,
+            content, parentId, isAdmin: false, approved: true, likes: 0,
+            createdAt: Date.now(), userRank: rank.id,
+            userAvatar: FB.user?.photoURL || null,
+            userUid: FB.user?.uid || null
         };
         if (FB.ok) {
-            try { await FB.db.collection('comments').doc(cm.id).set(cm); }
-            catch (e) {}
+            try { await FB.db.collection('comments').doc(cm.id).set(cm); } catch (e) {}
         }
         UI.showToast(I18n.t('comments.success'), 'success');
         const list = await this.load(pid);
@@ -1048,215 +1000,246 @@ const Comments = {
     }
 };
 
-// ==================== 14. CHAT MODULE (NEW) ====================
+// ==================== 14. CHAT SYSTEM ====================
 const Chat = {
     messages: [],
-    expiryDays: 3,
-    maxMessageLength: 100,
-    isAdmin: false,
-    totalWrites: 0,
-    listener: null,
-    
+    unsub: null,
     async init() {
-        this.expiryDays = Data.settings.chatExpiryDays || 3;
-        await this.checkAdmin();
-        await this.load();
-        this.bindUI();
-        this.startRealtime();
-    },
-    
-    async checkAdmin() {
-        if (!FB.user) { 
-            this.isAdmin = false; 
-            return; 
+        document.getElementById('chat-btn')?.addEventListener('click', () => {
+            UI.openModal('chat-modal');
+            this.load();
+        });
+        document.getElementById('chat-close')?.addEventListener('click', () => {
+            UI.closeModal('chat-modal');
+            this.unsubscribe();
+        });
+        document.getElementById('chat-send-btn')?.addEventListener('click', () => this.send());
+        const chatInput = document.getElementById('chat-input');
+        if (chatInput) {
+            chatInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter') { e.preventDefault(); this.send(); }
+            });
+            chatInput.addEventListener('input', () => {
+                const len = chatInput.value.length;
+                const counter = document.getElementById('chat-char-count');
+                if (counter) {
+                    counter.textContent = len + '/100';
+                    counter.className = 'chat-char-count' + (len > 100 ? ' over' : '');
+                }
+            });
         }
-        try {
-            const doc = await FB.db.collection('users').doc(FB.user.uid).get();
-            this.isAdmin = doc.exists && doc.data().role === 'admin';
-        } catch (e) {
-            this.isAdmin = false;
-        }
     },
-    
     async load() {
         if (!FB.ok) return;
+        this.unsubscribe();
+        const deleteDays = Data.settings.chatDeleteDays || 3;
+        const cutoff = Date.now() - (deleteDays * 24 * 60 * 60 * 1000);
         try {
-            const now = Date.now();
-            const cutoff = now - (this.expiryDays * 24 * 60 * 60 * 1000);
-            const snap = await FB.db.collection('chat')
+            this.unsub = FB.db.collection('chat')
                 .where('createdAt', '>=', cutoff)
                 .orderBy('createdAt', 'asc')
-                .limit(Data.settings.chatMaxMessages || 200)
-                .get();
-            this.messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        } catch (e) {
-            console.warn('Chat load failed:', e);
-        }
-    },
-    
-    startRealtime() {
-        if (!FB.ok || this.listener) return;
-        try {
-            const now = Date.now();
-            const cutoff = now - (this.expiryDays * 24 * 60 * 60 * 1000);
-            this.listener = FB.db.collection('chat')
-                .where('createdAt', '>=', cutoff)
-                .orderBy('createdAt', 'asc')
-                .limit(Data.settings.chatMaxMessages || 200)
-                .onSnapshot(snapshot => {
-                    this.messages = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                .limit(100)
+                .onSnapshot(snap => {
+                    this.messages = snap.docs.map(d => d.data());
                     this.render();
-                }, err => {
-                    console.warn('Chat realtime failed:', err);
                 });
-        } catch (e) {
-            console.warn('Chat realtime setup failed:', e);
-        }
+        } catch (e) { console.warn('Chat load failed:', e); }
     },
-    
-    stopRealtime() {
-        if (this.listener) {
-            this.listener();
-            this.listener = null;
-        }
+    unsubscribe() {
+        if (this.unsub) { this.unsub(); this.unsub = null; }
     },
-    
-    async send(content, authorName) {
-        content = (content || '').trim();
-        if (!content) {
-            UI.showToast(I18n.t('chat.emptyMsg'), 'error');
-            return;
-        }
-        if (content.length > this.maxMessageLength) {
-            UI.showToast(I18n.t('chat.tooLong') + ` (max ${this.maxMessageLength})`, 'error');
-            return;
-        }
-        
-        const msg = {
-            content: content,
-            authorName: authorName || (FB.user ? (FB.user.displayName || 'Member') : 'Anonymous'),
-            createdAt: Date.now(),
-            isAdmin: this.isAdmin
-        };
-        
-        try {
-            await FB.db.collection('chat').add(msg);
-            this.totalWrites++;
-            UI.showToast('✓', 'success', 1500);
-        } catch (e) {
-            console.error('Chat send failed:', e);
-            UI.showToast(I18n.t('toast.error'), 'error');
-        }
-    },
-    
-    async clearAll() {
-        if (!this.isAdmin) return;
-        if (!confirm(I18n.t('chat.clearConfirm'))) return;
-        
-        try {
-            const snap = await FB.db.collection('chat').get();
-            const batch = FB.db.batch();
-            snap.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-            this.messages = [];
-            this.render();
-            UI.showToast(I18n.t('chat.cleared'), 'success');
-        } catch (e) {
-            console.error('Clear chat failed:', e);
-            UI.showToast(I18n.t('toast.error'), 'error');
-        }
-    },
-    
-    async cleanup() {
-        if (!FB.ok) return;
-        try {
-            const cutoff = Date.now() - (this.expiryDays * 24 * 60 * 60 * 1000);
-            const snap = await FB.db.collection('chat')
-                .where('createdAt', '<', cutoff)
-                .get();
-            
-            if (snap.empty) return;
-            
-            const batch = FB.db.batch();
-            snap.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-            console.log(`Cleaned up ${snap.size} old chat messages`);
-        } catch (e) {
-            console.warn('Chat cleanup failed:', e);
-        }
-    },
-    
     render() {
-        const list = document.getElementById('chat-messages-list');
-        if (!list) return;
-        
+        const container = document.getElementById('chat-messages');
+        if (!container) return;
         if (!this.messages.length) {
-            list.innerHTML = '<div class="chat-empty"><i class="fas fa-comments"></i><p>' + I18n.t('chat.empty') + '</p></div>';
+            container.innerHTML = '<div class="chat-empty">' + I18n.t('chat.empty') + '</div>';
             return;
         }
-        
-        list.innerHTML = this.messages.map(m => {
-            const date = new Date(m.createdAt);
-            const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const adminBadge = m.isAdmin ? ' <span class="chat-admin-badge">' + I18n.t('chat.admin') + '</span>' : '';
-            return `
-                <div class="chat-message ${m.isAdmin ? 'chat-admin-msg' : ''}">
-                    <div class="chat-msg-header">
-                        <span class="chat-author">${Utils.escapeHtml(m.authorName)}${adminBadge}</span>
-                        <span class="chat-time">${time}</span>
-                    </div>
-                    <div class="chat-content">${Utils.escapeHtml(m.content)}</div>
-                </div>
-            `;
+        container.innerHTML = this.messages.map(m => {
+            const rankBadge = m.userRank ? '<span class="rank-badge ' + m.userRank + ' chat-msg-rank">' + m.userRank.toUpperCase() + '</span>' : '';
+            return '<div class="chat-message">' +
+                '<div class="chat-msg-avatar">' + Utils.escapeHtml((m.authorName || '?').charAt(0).toUpperCase()) + '</div>' +
+                '<div class="chat-msg-content">' +
+                '<div class="chat-msg-header">' +
+                '<span class="chat-msg-author">' + Utils.escapeHtml(m.authorName || 'Anonymous') + '</span>' +
+                rankBadge +
+                '<span class="chat-msg-time">' + Utils.timeAgo(m.createdAt) + '</span></div>' +
+                '<div class="chat-msg-text">' + Utils.escapeHtml(m.content || '') + '</div></div></div>';
         }).join('');
-        
-        list.scrollTop = list.scrollHeight;
+        container.scrollTop = container.scrollHeight;
     },
-    
-    bindUI() {
-        const form = document.getElementById('chat-form');
+    async send() {
         const input = document.getElementById('chat-input');
-        const counter = document.getElementById('chat-char-counter');
-        const clearBtn = document.getElementById('chat-clear-btn');
-        
-        if (input) {
-            input.addEventListener('input', () => {
-                const len = input.value.length;
-                if (counter) {
-                    counter.textContent = `${len}/${this.maxMessageLength}`;
-                    counter.className = len > this.maxMessageLength ? 'chat-counter over' : 'chat-counter';
-                }
+        const content = (input.value || '').trim();
+        if (!content || content.length > 100) return;
+        if (!FB.ok) { UI.showToast(I18n.t('coins.offline'), 'warning'); return; }
+        const name = FB.user ? (FB.user.displayName || FB.user.email.split('@')[0]) : 'Guest';
+        const rank = Coins.getRank();
+        try {
+            await FB.db.collection('chat').add({
+                content: content,
+                authorName: name,
+                userRank: rank.id,
+                createdAt: Date.now()
             });
+            input.value = '';
+            const counter = document.getElementById('chat-char-count');
+            if (counter) { counter.textContent = '0/100'; counter.className = 'chat-char-count'; }
+        } catch (e) {
+            UI.showToast(I18n.t('toast.error'), 'error');
         }
-        
-        if (form) {
-            form.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const content = input.value.trim();
-                if (content && content.length <= this.maxMessageLength) {
-                    this.send(content);
-                    input.value = '';
-                    if (counter) counter.textContent = `0/${this.maxMessageLength}`;
-                }
-            });
-        }
-        
-        if (clearBtn) {
-            clearBtn.style.display = this.isAdmin ? 'inline-flex' : 'none';
-            clearBtn.addEventListener('click', () => this.clearAll());
-        }
-    },
-    
-    getStats() {
-        return {
-            totalMessages: this.messages.length,
-            totalWrites: this.totalWrites,
-            expiryDays: this.expiryDays
-        };
     }
 };
 
-// ==================== 15. PAGES ====================
+// ==================== 15. PROFILE ====================
+const Profile = {
+    render() {
+        const container = document.getElementById('profile-content');
+        if (!container) return;
+        if (!FB.user) {
+            container.innerHTML = '<div style="text-align:center;padding:var(--space-2xl);">' +
+                '<i class="fas fa-user-circle" style="font-size:4rem;color:var(--text-muted);margin-bottom:var(--space-lg);"></i>' +
+                '<p>' + I18n.t('profile.login') + '</p>' +
+                '<button class="btn btn-primary" onclick="UI.closeModal(\'profile-modal\');UI.openModal(\'auth-modal\');">' + I18n.t('auth.login') + '</button></div>';
+            return;
+        }
+        const rank = Coins.getRank();
+        const bookmarks = LS.get(CONFIG.keys.bookmarks, []);
+        const readProgress = LS.get(CONFIG.keys.readProgress, {});
+        const postsRead = Object.keys(readProgress).length;
+        const name = FB.user.displayName || FB.user.email.split('@')[0];
+        const avatar = FB.user.photoURL;
+        container.innerHTML =
+            '<div style="text-align:center;">' +
+            (avatar ? '<img src="' + Utils.escapeHtml(avatar) + '" class="profile-avatar-large" alt="">' :
+                '<div class="profile-avatar-large" style="display:flex;align-items:center;justify-content:center;background:var(--card);">' + Utils.escapeHtml(name.charAt(0).toUpperCase()) + '</div>') +
+            '<h3 style="margin:var(--space-md) 0 var(--space-xs);">' + Utils.escapeHtml(name) + '</h3>' +
+            '<span class="rank-badge ' + rank.id + '">' + rank.icon + ' ' + rank.name[I18n.lang] + '</span>' +
+            '<p style="color:var(--text-muted);font-size:.85rem;margin-top:var(--space-xs);">' + Utils.escapeHtml(FB.user.email) + '</p></div>' +
+            '<div class="profile-stats-grid">' +
+            '<div class="profile-stat"><div class="profile-stat-value">' + (Coins.wallet?.totalEarned || 0) + '</div><div class="profile-stat-label">' + I18n.t('profile.coinsEarned') + '</div></div>' +
+            '<div class="profile-stat"><div class="profile-stat-value">' + postsRead + '</div><div class="profile-stat-label">' + I18n.t('profile.postsRead') + '</div></div>' +
+            '<div class="profile-stat"><div class="profile-stat-value">' + bookmarks.length + '</div><div class="profile-stat-label">' + I18n.t('reading.saved') + '</div></div>' +
+            '</div>' +
+            '<div style="text-align:center;margin-top:var(--space-lg);">' +
+            '<button class="btn btn-danger btn-sm" onclick="UserAuth.logout()"><i class="fas fa-sign-out-alt"></i> ' + I18n.t('auth.login') + ' → Logout</button></div>';
+    }
+};
+
+// ==================== 16. READING PROGRESS ====================
+const ReadingProgress = {
+    init() {
+        addEventListener('scroll', Utils.debounce(() => {
+            const postId = window._currentPostId;
+            if (!postId) return;
+            const progress = Math.min(100, Math.round((scrollY / (document.documentElement.scrollHeight - innerHeight)) * 100));
+            const bar = document.getElementById('reading-progress-bar');
+            if (bar) bar.style.width = progress + '%';
+            const progressData = LS.get(CONFIG.keys.readProgress, {});
+            progressData[postId] = Math.max(progress, progressData[postId] || 0);
+            LS.set(CONFIG.keys.readProgress, progressData);
+        }, 50));
+    },
+    saveBookmark(postId) {
+        const bookmarks = LS.get(CONFIG.keys.bookmarks, []);
+        if (!bookmarks.includes(postId)) {
+            bookmarks.push(postId);
+            LS.set(CONFIG.keys.bookmarks, bookmarks);
+            UI.showToast(I18n.t('reading.saved'), 'success');
+        }
+    }
+};
+
+// ==================== 17. ACHIEVEMENTS ====================
+const Achievements = {
+    definitions: [
+        { id: 'first_comment', name: { en: 'First Comment', ar: 'أول تعليق' }, icon: 'fa-comment', requirement: 1, type: 'comments' },
+        { id: 'bookworm', name: { en: 'Bookworm', ar: 'قارئ نهم' }, icon: 'fa-book', requirement: 10, type: 'postsRead' },
+        { id: 'rich', name: { en: 'Rich', ar: 'ثري' }, icon: 'fa-coins', requirement: 100, type: 'totalEarned' },
+        { id: 'chatterbox', name: { en: 'Chatterbox', ar: 'ثرثار' }, icon: 'fa-comments', requirement: 10, type: 'comments' },
+        { id: 'veteran', name: { en: 'Veteran', ar: 'مخضرم' }, icon: 'fa-medal', requirement: 500, type: 'totalEarned' }
+    ],
+    check() {
+        const earned = LS.get(CONFIG.keys.achievements, []);
+        let newAchievements = false;
+        for (const a of this.definitions) {
+            if (earned.includes(a.id)) continue;
+            let value = 0;
+            if (a.type === 'totalEarned') value = Coins.wallet?.totalEarned || 0;
+            else if (a.type === 'postsRead') value = Object.keys(LS.get(CONFIG.keys.readProgress, {})).length;
+            if (value >= a.requirement) {
+                earned.push(a.id);
+                newAchievements = true;
+                UI.showToast('🏆 ' + a.name[I18n.lang] + '!', 'success');
+            }
+        }
+        if (newAchievements) LS.set(CONFIG.keys.achievements, earned);
+    }
+};
+
+// ==================== 18. LEADERBOARD ====================
+const Leaderboard = {
+    async render() {
+        const container = document.getElementById('leaderboard-content');
+        if (!container) return;
+        if (!FB.ok) {
+            container.innerHTML = '<p style="text-align:center;color:var(--text-muted);">' + I18n.t('coins.offline') + '</p>';
+            return;
+        }
+        try {
+            const snap = await FB.db.collection('wallets')
+                .where('transferred', '!=', true)
+                .orderBy('totalEarned', 'desc')
+                .limit(10)
+                .get();
+            const wallets = snap.docs.map(d => d.data());
+            if (!wallets.length) {
+                container.innerHTML = '<p style="text-align:center;color:var(--text-muted);">No data yet.</p>';
+                return;
+            }
+            container.innerHTML = wallets.map((w, i) => {
+                const rank = Utils.getRank(w.totalEarned || 0);
+                const posClass = i === 0 ? 'top-1' : i === 1 ? 'top-2' : i === 2 ? 'top-3' : '';
+                const name = w.ownerUid ? 'Member' : 'Guest ' + w.id.slice(-4);
+                return '<div class="leaderboard-item ' + posClass + '">' +
+                    '<span class="leaderboard-rank">' + (i + 1) + '</span>' +
+                    '<span class="leaderboard-avatar" style="background:var(--card);display:flex;align-items:center;justify-content:center;">' + name.charAt(0) + '</span>' +
+                    '<div class="leaderboard-info"><div class="leaderboard-name">' + Utils.escapeHtml(name) + ' <span class="rank-badge ' + rank.id + '">' + rank.name[I18n.lang] + '</span></div></div>' +
+                    '<span class="leaderboard-coins"><i class="fas fa-coins"></i> ' + (w.totalEarned || 0) + '</span></div>';
+            }).join('');
+        } catch (e) {
+            container.innerHTML = '<p style="text-align:center;color:var(--text-muted);">Failed to load.</p>';
+        }
+    }
+};
+
+// ==================== 19. ONLINE USERS ====================
+const OnlineUsers = {
+    async update() {
+        if (!FB.ok || !FB.user) return;
+        try {
+            await FB.db.collection('online_users').doc(FB.user.uid).set({
+                uid: FB.user.uid,
+                name: FB.user.displayName || 'User',
+                lastSeen: Date.now(),
+                isOnline: true
+            });
+        } catch (e) {}
+    },
+    async getCount() {
+        const boost = Data.settings.onlineBoost || 0;
+        if (!FB.ok) return boost;
+        try {
+            const cutoff = Date.now() - (5 * 60 * 1000);
+            const snap = await FB.db.collection('online_users')
+                .where('lastSeen', '>=', cutoff)
+                .get();
+            return snap.size + boost;
+        } catch (e) { return boost; }
+    }
+};
+
+// ==================== 20. PAGES ====================
 const Pages = {
     lang() { return I18n.lang; },
     postCard(p) {
@@ -1275,13 +1258,11 @@ const Pages = {
             '<a href="#post/' + p.slug + '" class="post-card-link" aria-label="' + Utils.escapeHtml(p.title?.[L] || '') + '"></a></article>';
     },
     home(c) {
-        const L = this.lang();
         const f = Data.featured();
         const l = Data.latest(6);
         c.innerHTML =
             '<section class="hero reveal active"><div class="hero-badge"><span>' + I18n.t('hero.badge') + '</span></div>' +
-            '<h1 class="hero-title">KENVEN HUB</h1>' +
-            '<p class="hero-subtitle">' + I18n.t('hero.subtitle') + '</p>' +
+            '<h1 class="hero-title">KENVEN HUB</h1><p class="hero-subtitle">' + I18n.t('hero.subtitle') + '</p>' +
             '<div class="hero-actions"><a href="#posts" class="btn btn-primary"><i class="fas fa-rocket"></i> ' + I18n.t('hero.btn.explore') + '</a>' +
             '<a href="#affiliate" class="btn btn-secondary"><i class="fas fa-tag"></i> ' + I18n.t('hero.btn.deals') + '</a>' +
             '<a href="#chat" class="btn btn-ghost"><i class="fas fa-comments"></i> ' + I18n.t('nav.chat') + '</a></div></section>' +
@@ -1307,8 +1288,7 @@ const Pages = {
         const n = Data.byCategory(cat.slug).length;
         return '<div class="category-card reveal" onclick="location.hash=\'category/' + cat.slug + '\'">' +
             '<div class="category-icon" style="background:' + cat.color + '20;color:' + cat.color + ';"><i class="fas ' + cat.icon + '"></i></div>' +
-            '<h3 class="category-name">' + Utils.escapeHtml(cat.name[L]) + '</h3>' +
-            '<span class="category-count">' + n + ' ' + I18n.t('categories.posts') + '</span></div>';
+            '<h3 class="category-name">' + Utils.escapeHtml(cat.name[L]) + '</h3><span class="category-count">' + n + ' ' + I18n.t('categories.posts') + '</span></div>';
     },
     allPosts(c) {
         c.innerHTML = '<section><div class="section-header"><h1 class="section-title"><i class="fas fa-newspaper"></i> ' + I18n.t('nav.posts') + '</h1></div>' +
@@ -1320,8 +1300,7 @@ const Pages = {
         if (!cat) { this.notFound(c); return; }
         const p = Data.byCategory(s);
         c.innerHTML = '<section><div class="section-header"><h1 class="section-title" style="color:' + cat.color + ';"><i class="fas ' + cat.icon + '"></i> ' + Utils.escapeHtml(cat.name[L]) + '</h1></div>' +
-            (p.length ? '<div class="posts-grid">' + p.map(x => this.postCard(x)).join('') + '</div>' : '<div class="empty-state"><p>' + I18n.t('empty.posts') + '</p></div>') +
-            '</section>';
+            (p.length ? '<div class="posts-grid">' + p.map(x => this.postCard(x)).join('') + '</div>' : '<div class="empty-state"><p>' + I18n.t('empty.posts') + '</p></div>') + '</section>';
     },
     categories(c) {
         c.innerHTML = '<section><div class="section-header"><h1 class="section-title"><i class="fas fa-folder-open"></i> ' + I18n.t('nav.categories') + '</h1></div>' +
@@ -1329,9 +1308,7 @@ const Pages = {
     },
     affiliate(c) {
         const L = this.lang();
-        const t = Data.affiliate.length ? Data.affiliate : [
-            { name: 'Hostinger', icon: 'fa-server', color: '#673DE6', rating: 4.8, description: 'Premium hosting', url: 'https://hostinger.com' }
-        ];
+        const t = Data.affiliate.length ? Data.affiliate : [];
         c.innerHTML = '<section style="text-align:center;"><div class="section-header" style="justify-content:center;">' +
             '<h1 class="section-title"><i class="fas fa-tag"></i> ' + I18n.t('nav.deals') + '</h1></div>' +
             '<p style="max-width:600px;margin:0 auto var(--space-xl);">' + I18n.t('deals.subtitle') + '</p>' +
@@ -1341,42 +1318,21 @@ const Pages = {
                 '<div style="width:60px;height:60px;margin:0 auto var(--space-md);border-radius:var(--radius-md);background:' + (x.color || '#5B9FFF') + '20;color:' + (x.color || '#5B9FFF') + ';display:flex;align-items:center;justify-content:center;font-size:1.5rem;"><i class="fas ' + (x.icon || 'fa-link') + '"></i></div>' +
                 '<h3>' + Utils.escapeHtml(x.name || '') + '</h3>' +
                 '<div style="color:var(--neon-yellow);margin-bottom:var(--space-sm);">★ ' + (x.rating || 5) + '</div>' +
-                '<p style="font-size:.9rem;">' + Utils.escapeHtml(x.description || x.desc?.[L] || '') + '</p>' +
+                '<p style="font-size:.9rem;">' + Utils.escapeHtml(x.description || '') + '</p>' +
                 '<a href="' + Utils.escapeHtml(x.url || '#') + '" target="_blank" rel="noopener noreferrer nofollow" class="btn btn-primary" style="width:100%;">' + I18n.t('affiliate.visit') + ' <i class="fas fa-external-link-alt"></i></a></div></div>'
             ).join('') + '</div></section>';
     },
     about(c) {
         c.innerHTML = '<section style="text-align:center;max-width:800px;margin:0 auto;">' +
             '<img src="' + CONFIG.site.logo + '" alt="" style="width:100px;height:100px;border-radius:50%;margin:0 auto var(--space-xl);box-shadow:var(--shadow-neon);">' +
-            '<h1>' + I18n.t('nav.about') + '</h1>' +
-            '<p style="font-size:1.1rem;">' + I18n.t('about.text') + '</p>' +
-            '<div class="hero-actions">' +
-            '<a href="' + CONFIG.site.discord + '" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-discord"></i> Discord</a>' +
+            '<h1>' + I18n.t('nav.about') + '</h1><p style="font-size:1.1rem;">' + I18n.t('about.text') + '</p>' +
+            '<div class="hero-actions"><a href="' + CONFIG.site.discord + '" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-discord"></i> Discord</a>' +
             '<a href="' + CONFIG.site.website + '" target="_blank" rel="noopener noreferrer" class="btn btn-secondary"><i class="fas fa-globe"></i> Kenven Service</a></div></section>';
-    },
-    chat(c) {
-        c.innerHTML = '<section class="chat-page">' +
-            '<div class="section-header"><h1 class="section-title"><i class="fas fa-comments"></i> ' + I18n.t('chat.title') + '</h1>' +
-            '<button id="chat-clear-btn" class="btn btn-danger" style="display:none;"><i class="fas fa-trash"></i> ' + I18n.t('chat.clearAll') + '</button></div>' +
-            '<p style="color:var(--text-secondary);margin-bottom:var(--space-lg);">' + I18n.t('chat.subtitle') + '</p>' +
-            '<div class="chat-container">' +
-            '<div class="chat-messages" id="chat-messages-list"></div>' +
-            '<form class="chat-form" id="chat-form">' +
-            '<div class="chat-input-wrapper">' +
-            '<input type="text" id="chat-input" class="form-input" placeholder="' + I18n.t('chat.placeholder') + '" maxlength="100" autocomplete="off">' +
-            '<span class="chat-counter" id="chat-char-counter">0/100</span>' +
-            '</div>' +
-            '<button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> ' + I18n.t('chat.send') + '</button>' +
-            '</form></div></section>';
-        
-        Chat.render();
-        Chat.bindUI();
     },
     notFound(c) {
         c.innerHTML = '<section style="text-align:center;padding:var(--space-3xl) 0;">' +
             '<h1 style="font-family:var(--font-mono);font-size:5rem;color:var(--neon);">404</h1>' +
-            '<p>' + I18n.t('post.notFound') + '</p>' +
-            '<a href="#home" class="btn btn-primary">' + I18n.t('btn.backHome') + '</a></section>';
+            '<p>' + I18n.t('post.notFound') + '</p><a href="#home" class="btn btn-primary">' + I18n.t('btn.backHome') + '</a></section>';
     },
     async post(c, slug) {
         const L = this.lang();
@@ -1392,25 +1348,19 @@ const Pages = {
         const heads = [...raw.matchAll(/<h([23])[^>]*>(.*?)<\/h\1>/gi)];
         if (heads.length) {
             toc = '<div class="post-toc reveal"><h3><i class="fas fa-list"></i> ' + I18n.t('post.toc') + '</h3><ul class="toc-list">' +
-                heads.map((h, i) => '<li><a href="#sec-' + i + '">' + h[2].replace(/<[^>]*>/g, '') + '</a></li>').join('') +
-                '</ul></div>';
+                heads.map((h, i) => '<li><a href="#sec-' + i + '">' + h[2].replace(/<[^>]*>/g, '') + '</a></li>').join('') + '</ul></div>';
         }
         let html = raw;
-        heads.forEach((h, i) => {
-            html = html.replace(h[0], h[0].replace('<h' + h[1], '<h' + h[1] + ' id="sec-' + i + '"'));
-        });
-        const affIds = p.affiliateIds && p.affiliateIds.length ? p.affiliateIds
-            : (p.isAffiliate && Data.affiliate.length ? [Data.affiliate[0].id] : []);
+        heads.forEach((h, i) => { html = html.replace(h[0], h[0].replace('<h' + h[1], '<h' + h[1] + ' id="sec-' + i + '"')); });
+        const affIds = p.affiliateIds && p.affiliateIds.length ? p.affiliateIds : (p.isAffiliate && Data.affiliate.length ? [Data.affiliate[0].id] : []);
         const affBoxes = affIds.map(id => Data.affiliate.find(a => a.id === id)).filter(Boolean);
         if (affBoxes.length) {
             const seg = html.split(/(<h2[^>]*>)/);
             if (seg.length > 3) {
                 const idx = 1 + (Utils.hashCode(p.id) % Math.max(1, Math.floor((seg.length - 1) / 2))) * 2;
                 const a = affBoxes[0];
-                const box = '<div class="inline-affiliate">' +
-                    '<div class="inline-affiliate-icon"><i class="fas ' + (a.icon || 'fa-tag') + '"></i></div>' +
-                    '<div class="inline-affiliate-info">' +
-                    '<div class="inline-affiliate-name">' + Utils.escapeHtml(a.name || '') + '</div>' +
+                const box = '<div class="inline-affiliate"><div class="inline-affiliate-icon"><i class="fas ' + (a.icon || 'fa-tag') + '"></i></div>' +
+                    '<div class="inline-affiliate-info"><div class="inline-affiliate-name">' + Utils.escapeHtml(a.name || '') + '</div>' +
                     '<div class="inline-affiliate-stars">★ ' + (a.rating || 5) + '</div>' +
                     '<div class="inline-affiliate-desc">' + Utils.escapeHtml(a.description || '') + '</div>' +
                     '<span class="inline-affiliate-tag">' + I18n.t('affiliate.sponsored') + '</span></div>' +
@@ -1424,27 +1374,27 @@ const Pages = {
             body = '<div class="post-content reveal">' + html + '</div>';
         } else {
             const prev = html.split('</p>')[0] + '</p>';
-            body = '<div class="paywall-wrapper">' +
-                '<div class="paywall-preview">' + prev + '</div>' +
-                '<div class="paywall-card">' +
-                '<div class="paywall-icon"><i class="fas fa-lock"></i></div>' +
+            body = '<div class="paywall-wrapper"><div class="paywall-preview">' + prev + '</div>' +
+                '<div class="paywall-card"><div class="paywall-icon"><i class="fas fa-lock"></i></div>' +
                 '<h2 class="paywall-title">' + I18n.t('paywall.title') + '</h2>' +
                 '<p class="paywall-text">' + I18n.t('paywall.text') + '</p>' +
                 '<div class="paywall-price"><i class="fas fa-coins"></i> ' + price + ' <small>' + I18n.t('coins.coins') + '</small></div>' +
-                '<div class="paywall-actions">' +
-                '<button class="btn btn-gold" id="unlock-btn"><i class="fas fa-unlock"></i> ' + I18n.t('paywall.unlock') + ' ' + price + '</button>' +
+                '<div class="paywall-actions"><button class="btn btn-gold" id="unlock-btn"><i class="fas fa-unlock"></i> ' + I18n.t('paywall.unlock') + ' ' + price + '</button>' +
                 '<button class="btn btn-secondary" id="earn-more-btn"><i class="fas fa-coins"></i> ' + I18n.t('paywall.earn') + '</button></div>' +
-                '<div class="paywall-balance">' + I18n.t('paywall.balance') + ': <strong style="color:var(--gold);">' + (Coins.wallet?.balance || 0) + '</strong></div>' +
-                '</div></div>';
+                '<div class="paywall-balance">' + I18n.t('paywall.balance') + ': <strong style="color:var(--gold);">' + (Coins.wallet?.balance || 0) + '</strong></div></div></div>';
         }
+        const youtubeEmbed = Utils.embedYoutube(p.youtubeUrl);
         c.innerHTML = '<article class="post-page">' +
+            '<div class="reading-progress-container"><div class="reading-progress-bar-bg"><div class="reading-progress-bar-fill" id="reading-progress-bar" style="width:0%"></div></div></div>' +
             '<header class="post-header reveal active">' +
             (cat ? '<a href="#category/' + cat.slug + '" class="badge" style="color:' + cat.color + ';border:1px solid ' + cat.color + ';background:' + cat.color + '20;"><i class="fas ' + cat.icon + '"></i> ' + Utils.escapeHtml(cat.name[L]) + '</a>' : '') +
             '<h1 class="post-title">' + Utils.escapeHtml(p.title?.[L] || '') + '</h1>' +
             '<div class="post-meta"><span><i class="fas fa-calendar"></i> ' + Utils.formatDate(p.createdAt, L) + '</span>' +
             '<span><i class="fas fa-clock"></i> ' + Utils.readingTime(raw) + ' ' + I18n.t('post.readingTime') + '</span>' +
-            '<span><i class="fas fa-eye"></i> ' + (p.views || 0) + ' ' + I18n.t('post.views') + '</span></div></header>' +
+            '<span><i class="fas fa-eye"></i> ' + (p.views || 0) + ' ' + I18n.t('post.views') + '</span>' +
+            '<button class="btn btn-sm btn-ghost" onclick="ReadingProgress.saveBookmark(\'' + p.id + '\')" style="margin-left:auto;"><i class="fas fa-bookmark"></i></button></div></header>' +
             '<div class="post-cover reveal"><img src="' + (p.coverImage || '') + '" alt="" loading="lazy"></div>' +
+            youtubeEmbed +
             (p.isAffiliate ? '<div class="affiliate-disclosure reveal"><h3><i class="fas fa-info-circle"></i> ' + I18n.t('affiliate.disclosure.title') + '</h3><p>' + I18n.t('affiliate.disclosure.text') + '</p></div>' : '') +
             toc + body +
             (p.downloadLink && unlocked ? '<div style="text-align:center;margin:var(--space-2xl) 0;"><a href="' + Utils.escapeHtml(p.downloadLink) + '" target="_blank" rel="noopener noreferrer" class="btn btn-primary glow" style="font-size:1.15rem;padding:var(--space-lg) var(--space-2xl);"><i class="fas fa-download"></i> ' + Utils.escapeHtml(p.buttonText?.[L] || p.buttonText?.en || 'Download') + '</a></div>' : '') +
@@ -1452,12 +1402,11 @@ const Pages = {
             (Data.related(p).length ? '<section class="reveal"><h2 class="section-title"><i class="fas fa-link"></i> ' + I18n.t('post.related') + '</h2><div class="posts-grid">' + Data.related(p).map(x => this.postCard(x)).join('') + '</div></section>' : '') +
             '<section class="comments-section reveal"><div class="comments-header"><h2 class="section-title"><i class="fas fa-comments"></i> ' + I18n.t('comments.title') + '</h2>' +
             '<div class="comments-sort"><button class="filter-chip active" data-sort="latest">' + I18n.t('comments.sort.latest') + '</button><button class="filter-chip" data-sort="oldest">' + I18n.t('comments.sort.oldest') + '</button><button class="filter-chip" data-sort="liked">' + I18n.t('comments.sort.liked') + '</button></div></div>' +
-            '<form class="comment-form" id="comment-form"><div class="form-group"><input type="text" id="comment-name" class="form-input" placeholder="' + I18n.t('comments.name') + '"></div><div class="form-group"><input type="email" id="comment-email" class="form-input" placeholder="' + I18n.t('comments.email') + '"></div><div class="form-group"><textarea id="comment-content" class="form-textarea" placeholder="' + I18n.t('comments.content') + '"></textarea></div><button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> ' + I18n.t('comments.submit') + '</button></form><div id="comments-list"></div></section></article>';
+            (FB.user ? '' : '<form class="comment-form" id="comment-form"><div class="form-group"><input type="text" id="comment-name" class="form-input" placeholder="' + I18n.t('comments.name') + '"></div><div class="form-group"><input type="email" id="comment-email" class="form-input" placeholder="' + I18n.t('comments.email') + '"></div><div class="form-group"><textarea id="comment-content" class="form-textarea" placeholder="' + I18n.t('comments.content') + '"></textarea></div><button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> ' + I18n.t('comments.submit') + '</button></form>' :
+                '<form class="comment-form" id="comment-form"><div class="form-group"><textarea id="comment-content" class="form-textarea" placeholder="' + I18n.t('comments.content') + '"></textarea></div><button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> ' + I18n.t('comments.submit') + '</button></form>') +
+            '<div id="comments-list"></div></section></article>';
         document.getElementById('share-post-btn')?.addEventListener('click', () => UI.openModal('share-modal'));
-        document.getElementById('comment-form')?.addEventListener('submit', e => {
-            e.preventDefault();
-            Comments.submit(p.id);
-        });
+        document.getElementById('comment-form')?.addEventListener('submit', e => { e.preventDefault(); Comments.submit(p.id); });
         document.querySelectorAll('.comments-sort .filter-chip').forEach(b => {
             b.onclick = async e => {
                 document.querySelectorAll('.comments-sort .filter-chip').forEach(x => x.classList.remove('active'));
@@ -1482,7 +1431,7 @@ const Pages = {
     }
 };
 
-// ==================== 16. ROUTER ====================
+// ==================== 21. ROUTER ====================
 const Router = {
     route: '',
     init() {
@@ -1501,12 +1450,6 @@ const Router = {
     renderCurrent() {
         const c = document.getElementById('app-container');
         if (!c) return;
-        
-        // Stop chat listener when leaving chat page
-        if (this.route !== 'chat') {
-            Chat.stopRealtime();
-        }
-        
         const r = this.route;
         if (r === 'home' || r === '') Pages.home(c);
         else if (r === 'posts') Pages.allPosts(c);
@@ -1515,13 +1458,14 @@ const Router = {
         else if (r.startsWith('category/')) Pages.category(c, r.split('/')[1]);
         else if (r === 'affiliate' || r === 'deals') Pages.affiliate(c);
         else if (r === 'about') Pages.about(c);
-        else if (r === 'chat') Pages.chat(c);
+        else if (r === 'chat') { UI.openModal('chat-modal'); Chat.load(); Router.handle(); }
+        else if (r === 'leaderboard') { UI.openModal('leaderboard-modal'); Leaderboard.render(); Router.handle(); }
         else Pages.notFound(c);
         Effects.reveal();
     }
 };
 
-// ==================== 17. SEARCH / SHARE / NEWSLETTER ====================
+// ==================== 22. SEARCH / SHARE / NEWSLETTER ====================
 const Search = {
     filter: 'all',
     init() {
@@ -1548,15 +1492,12 @@ const Search = {
     run(q) {
         const b = document.getElementById('search-results');
         if (!b) return;
-        if (!q.trim()) {
-            b.innerHTML = '<div class="search-empty">' + I18n.t('search.empty') + '</div>';
-            return;
-        }
+        if (!q.trim()) { b.innerHTML = '<div class="search-empty">' + I18n.t('search.empty') + '</div>'; return; }
         const r = Data.search(q, this.filter);
         const L = I18n.lang;
         b.innerHTML = r.length
             ? '<div style="color:var(--text-muted);font-size:.85rem;margin-bottom:var(--space-md);">' + r.length + ' ' + I18n.t('search.results') + '</div>' +
-              r.map(p => '<div class="search-result-item" onclick="location.hash=\'post/' + p.slug + '\';UI.closeModal(\'search-modal\');"><img src="' + p.coverImage + '" class="search-result-image" alt="" loading="lazy"><div><div class="search-result-title">' + Utils.escapeHtml(p.title?.[L] || '') + '</div><div class="search-result-excerpt">' + Utils.escapeHtml(Utils.truncate(p.excerpt?.[L] || '')) + '</div></div></div>').join('')
+            r.map(p => '<div class="search-result-item" onclick="location.hash=\'post/' + p.slug + '\';UI.closeModal(\'search-modal\');"><img src="' + p.coverImage + '" class="search-result-image" alt="" loading="lazy"><div><div class="search-result-title">' + Utils.escapeHtml(p.title?.[L] || '') + '</div><div class="search-result-excerpt">' + Utils.escapeHtml(Utils.truncate(p.excerpt?.[L] || '')) + '</div></div></div>').join('')
             : '<div class="search-empty">' + I18n.t('search.noResults') + ' "' + Utils.escapeHtml(q) + '"</div>';
     }
 };
@@ -1570,8 +1511,7 @@ const Share = {
         });
     },
     do(p) {
-        const u = location.href;
-        const t = document.title;
+        const u = location.href, t = document.title;
         const urls = {
             twitter: 'https://twitter.com/intent/tweet?url=' + encodeURIComponent(u) + '&text=' + encodeURIComponent(t),
             facebook: 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(u),
@@ -1593,13 +1533,9 @@ const Newsletter = {
             e.preventDefault();
             const i = document.getElementById('newsletter-email');
             const em = i.value.trim();
-            if (!Utils.isValidEmail(em)) {
-                UI.showToast(I18n.t('newsletter.error'), 'error');
-                return;
-            }
+            if (!Utils.isValidEmail(em)) { UI.showToast(I18n.t('newsletter.error'), 'error'); return; }
             if (FB.ok) {
-                try { await FB.db.collection('subscribers').add({ email: em, date: Date.now() }); }
-                catch (e) {}
+                try { await FB.db.collection('subscribers').add({ email: em, date: Date.now() }); } catch (e) {}
             }
             i.value = '';
             UI.showToast(I18n.t('newsletter.success'), 'success');
@@ -1607,7 +1543,7 @@ const Newsletter = {
     }
 };
 
-// ==================== 18. NAVBAR ====================
+// ==================== 23. NAVBAR ====================
 const Navbar = {
     init() {
         addEventListener('scroll', Utils.debounce(() => {
@@ -1622,6 +1558,10 @@ const Navbar = {
         });
         document.getElementById('lang-switcher')?.addEventListener('click', () => I18n.toggle());
         document.getElementById('effects-toggle')?.addEventListener('click', () => Effects.toggle());
+        document.getElementById('leaderboard-btn')?.addEventListener('click', () => {
+            UI.openModal('leaderboard-modal');
+            Leaderboard.render();
+        });
         document.addEventListener('keydown', e => {
             if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
                 e.preventDefault();
@@ -1658,55 +1598,82 @@ const Navbar = {
     }
 };
 
-// ==================== 19. COOKIE CONSENT ====================
+// ==================== 24. COOKIE CONSENT ====================
 const CookieConsent = {
-    key: 'kenven_hub_cookie_consent',
     init() {
-        const consent = LS.get(this.key);
+        const consent = LS.get(CONFIG.keys.cookieConsent);
         if (consent !== null) return;
         const banner = document.getElementById('cookie-banner');
         if (banner) banner.style.display = 'block';
-        const acceptBtn = document.getElementById('cookie-accept') || document.getElementById('cookie-accept-btn');
-        const declineBtn = document.getElementById('cookie-decline') || document.getElementById('cookie-decline-btn');
-        acceptBtn?.addEventListener('click', () => this.accept());
-        declineBtn?.addEventListener('click', () => this.decline());
+        document.getElementById('cookie-accept-btn')?.addEventListener('click', () => this.accept());
+        document.getElementById('cookie-decline-btn')?.addEventListener('click', () => this.decline());
     },
     accept() {
-        LS.set(this.key, 'accepted');
+        LS.set(CONFIG.keys.cookieConsent, 'accepted');
         document.getElementById('cookie-banner').style.display = 'none';
     },
     decline() {
-        LS.set(this.key, 'declined');
+        LS.set(CONFIG.keys.cookieConsent, 'declined');
         document.getElementById('cookie-banner').style.display = 'none';
     }
 };
 
-// ==================== 20. MAINTENANCE CHECK ====================
+// ==================== 25. MAINTENANCE ====================
 const Maintenance = {
-    async check() {
-        if (!FB.ok) return false;
-        try {
-            const doc = await FB.db.collection('settings').doc('site').get();
-            if (doc.exists) {
-                const data = doc.data();
-                if (data.maintenance && data.maintenance.enabled) {
-                    this.show(data.maintenance);
-                    return true;
-                }
-            }
-        } catch (e) {}
+    check() {
+        const m = Data.settings.maintenance;
+        if (m && m.enabled) {
+            this.show(m);
+            return true;
+        }
         return false;
     },
     show(m) {
+        const screen = document.getElementById('maintenance-screen');
+        if (!screen) return;
+        screen.style.display = 'flex';
         const msg = m.message || (I18n.lang === 'ar' ? 'الموقع تحت الصيانة. سنعود قريباً!' : 'Site is under maintenance. We will be back soon!');
-        const eta = m.eta ? '<p class="maintenance-eta"><i class="fas fa-clock"></i> ' + Utils.escapeHtml(m.eta) + '</p>' : '';
-        document.body.innerHTML = '<div class="maintenance-screen"><div><div class="maintenance-icon"><i class="fas fa-tools"></i></div>' +
-            '<h1 class="maintenance-title">KENVEN HUB</h1>' +
-            '<p class="maintenance-msg">' + Utils.escapeHtml(msg) + '</p>' + eta + '</div></div>';
+        const msgEl = document.getElementById('maintenance-msg');
+        if (msgEl) msgEl.textContent = msg;
+        const etaEl = document.getElementById('maintenance-eta');
+        const etaText = document.getElementById('maintenance-eta-text');
+        if (m.eta) {
+            if (etaEl) etaEl.style.display = 'inline-flex';
+            if (etaText) etaText.textContent = m.eta;
+        }
+        const particles = document.getElementById('maintenance-particles');
+        if (particles) {
+            particles.innerHTML = '';
+            for (let i = 0; i < 20; i++) {
+                const s = document.createElement('span');
+                s.className = 'maintenance-particle';
+                s.style.left = Math.random() * 100 + '%';
+                s.style.animationDuration = (4 + Math.random() * 6) + 's';
+                s.style.animationDelay = Math.random() * 5 + 's';
+                particles.appendChild(s);
+            }
+        }
     }
 };
 
-// ==================== 21. APP INIT ====================
+// ==================== 26. ONLINE COUNTER ====================
+const OnlineCounter = {
+    async init() {
+        const update = async () => {
+            const count = await OnlineUsers.getCount();
+            const el = document.getElementById('online-count');
+            if (el) el.textContent = count;
+        };
+        update();
+        setInterval(update, 30000);
+        if (FB.user) {
+            OnlineUsers.update();
+            setInterval(() => OnlineUsers.update(), 60000);
+        }
+    }
+};
+
+// ==================== 27. APP INIT ====================
 const App = {
     async init() {
         try {
@@ -1716,27 +1683,22 @@ const App = {
             Theme.init();
             Effects.init();
             await Data.load();
-            const isMaintenance = await Maintenance.check();
+            const isMaintenance = Maintenance.check();
             if (isMaintenance) return;
             CookieConsent.init();
             await Coins.init();
             UserAuth.init();
+            Chat.init();
+            ReadingProgress.init();
             Navbar.init();
             Search.init();
             Share.init();
             Newsletter.init();
             Router.init();
-            
-            // Initialize Chat module
-            await Chat.init();
-            
-            // Run chat cleanup daily
-            Chat.cleanup();
-            
-            if (FB.ok) FB.auth.onAuthStateChanged(async u => {
+            OnlineCounter.init();
+            if (FB.ok) FB.auth.onAuthStateChanged(u => {
                 Coins.onAuthChange(u);
-                await Chat.checkAdmin();
-                Chat.bindUI();
+                OnlineUsers.update();
             });
             if ('serviceWorker' in navigator) {
                 addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -1754,4 +1716,5 @@ window.addEventListener('error', e => console.warn('Caught:', e.message));
 document.addEventListener('DOMContentLoaded', () => App.init());
 window.UI = UI;
 window.Router = Router;
-window.Chat = Chat;
+window.ReadingProgress = ReadingProgress;
+window.UserAuth = UserAuth;
