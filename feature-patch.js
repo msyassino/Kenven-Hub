@@ -1,53 +1,42 @@
-/* Kenven Hub feature helpers loaded after app.js/admin.js */
+/* KENVEN HUB - runtime feature patch */
 'use strict';
+(function(){
+  const isMain=!!document.getElementById('app-container');
+  const isAdmin=!!document.getElementById('admin-dashboard');
+  if(!isMain&&!isAdmin)return;
+  window.KenvenHub=window.KenvenHub||{};
+  const KH=window.KenvenHub;
+  KH.safe=v=>{if(typeof Utils!=='undefined'&&Utils.escapeHtml)return Utils.escapeHtml(String(v??''));const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
+  KH.rank=(total,manual)=>{if(typeof CONFIG!=='undefined'&&Array.isArray(CONFIG.ranks)){if(manual&&manual!=='auto')return CONFIG.ranks.find(r=>r.id===manual)||CONFIG.ranks[0];const n=Number(total)||0;let r=CONFIG.ranks[0];for(const x of CONFIG.ranks)if(n>=x.minCoins)r=x;return r}const n=Number(total)||0;if(manual&&manual!=='auto')return{id:manual,name:{en:manual,ar:manual},dailyGift:10};if(n>=1500)return{id:'vip',name:{en:'VIP',ar:'VIP'},dailyGift:10};if(n>=800)return{id:'diamond',name:{en:'Diamond',ar:'ألماسي'},dailyGift:7};if(n>=400)return{id:'platinum',name:{en:'Platinum',ar:'بلاتيني'},dailyGift:5};if(n>=150)return{id:'gold',name:{en:'Gold',ar:'ذهبي'},dailyGift:3};if(n>=50)return{id:'silver',name:{en:'Silver',ar:'فضي'},dailyGift:2};return{id:'bronze',name:{en:'Bronze',ar:'برونز'},dailyGift:1};};
+  function loadRankConfig(){if(!isMain||typeof Data==='undefined'||!Array.isArray(Data.settings?.rankConfig))return;const merged=Data.settings.rankConfig.map((x,i)=>({...CONFIG.ranks[i],...x}));if(merged.length===CONFIG.ranks.length)CONFIG.ranks=merged;}
+  async function loadUser(){if(!isMain||typeof FB==='undefined'||!FB.ok||!FB.user)return null;try{const s=await FB.db.collection('users').doc(FB.user.uid).get();const u=s.exists?s.data():{};if(typeof Coins!=='undefined')Coins.userRecord=u;return u}catch(_){return null}}
 
-window.KenvenHub = window.KenvenHub || {};
-window.KenvenHub.safe = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-window.KenvenHub.rank = total => {
-  const n = Number(total) || 0;
-  if (n >= 1500) return {id:'vip', name:'VIP', dailyGift:10};
-  if (n >= 800) return {id:'diamond', name:'Diamond', dailyGift:7};
-  if (n >= 400) return {id:'platinum', name:'Platinum', dailyGift:5};
-  if (n >= 150) return {id:'gold', name:'Gold', dailyGift:3};
-  if (n >= 50) return {id:'silver', name:'Silver', dailyGift:2};
-  return {id:'bronze', name:'Bronze', dailyGift:1};
-};
-
-// Deterministic daily cleanup helper for chat; actual deletion should be secured by Firestore rules/server automation.
-window.KenvenHub.chatCutoff = days => Date.now() - Math.max(1, Number(days)||3) * 86400000;
-
-// Manual video reward submission. Admin approval is required before any coins/VIP are granted.
-window.KenvenHub.submitVideoReward = async (videoUrl, screenshotUrl, views, likes) => {
-  if (typeof FB === 'undefined' || !FB.ok || !FB.user) throw new Error('LOGIN_REQUIRED');
-  if ((Number(views)||0) < 1000 || (Number(likes)||0) < 20) throw new Error('REQUIREMENTS_NOT_MET');
-  const id = (typeof Utils !== 'undefined' ? Utils.genId() : Date.now().toString(36));
-  await FB.db.collection('video_reward_submissions').doc(id).set({
-    id, uid: FB.user.uid, email: FB.user.email || '', videoUrl: String(videoUrl||'').trim(),
-    screenshotUrl: String(screenshotUrl||'').trim(), claimedViews: Number(views)||0,
-    claimedLikes: Number(likes)||0, status: 'pending', createdAt: Date.now()
-  });
-  return id;
-};
-
-// Coupons are public, but managed from the admin panel.
-window.KenvenHub.loadCoupons = async container => {
-  if (typeof FB === 'undefined' || !FB.ok || !container) return;
-  const snap = await FB.db.collection('coupons').where('active','==',true).get();
-  const coupons = snap.docs.map(d => ({id:d.id, ...d.data()})).filter(c => !c.usedUp);
-  container.innerHTML = coupons.length ? coupons.map(c =>
-    `<article class="coupon-card" data-coupon-id="${window.KenvenHub.safe(c.id)}">
-      <div class="coupon-icon"><i class="fas ${window.KenvenHub.safe(c.icon||'fa-ticket-alt')}"></i></div>
-      <div class="coupon-info"><div class="coupon-title">${window.KenvenHub.safe(c.title||'Coupon')}</div>
-      <div class="coupon-desc">${window.KenvenHub.safe(c.description||'')}</div></div>
-      <div class="coupon-code-box"><span class="coupon-code">${window.KenvenHub.safe(c.code||'')}</span>
-      <button class="copy-coupon-btn" data-code="${window.KenvenHub.safe(c.code||'')}"><i class="fas fa-copy"></i></button></div>
-    </article>`).join('') : '<div class="rewards-empty"><i class="fas fa-ticket-alt"></i><p>No coupons available right now.</p></div>';
-  container.querySelectorAll('.copy-coupon-btn').forEach(btn => btn.addEventListener('click', async () => {
-    const code = btn.dataset.code || '';
-    try { await navigator.clipboard.writeText(code); } catch(e) {
-      const ta=document.createElement('textarea'); ta.value=code; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  if(isMain){
+    loadRankConfig();
+    if(typeof Coins!=='undefined'){
+      const oldInit=Coins.init?.bind(Coins);const oldAuth=Coins.onAuthChange?.bind(Coins);
+      Coins.userRecord=null;
+      Coins.getRank=function(){return KH.rank(this.wallet?.totalEarned||this.userRecord?.totalEarned||0,this.userRecord?.manualRank||this.wallet?.manualRank)};
+      Coins.getDailyGiftAmount=function(){return Number(this.getRank().dailyGift??Data.settings.dailyGiftAmount??1)};
+      Coins.init=async function(){const r=oldInit?await oldInit():undefined;await loadUser();return r};
+      if(oldAuth)Coins.onAuthChange=async function(u){const r=await oldAuth(u);await loadUser();return r};
+      Coins.transferCoins=async function(toCode,amount){const targetCode=String(toCode||'').trim(),n=Math.floor(Number(amount)||0);if(!this.wallet||n<=0)return false;if((this.wallet.balance||0)<n){UI.showToast(I18n.t('coins.notEnough'),'warning');return false}if(!targetCode||targetCode===this.wallet.id){UI.showToast(I18n.t('coins.sameWallet'),'warning');return false}if(!FB.ok){UI.showToast(I18n.t('coins.offline'),'warning');return false}try{const sRef=FB.db.collection('wallets').doc(this.wallet.id),tRef=FB.db.collection('wallets').doc(targetCode),log=FB.db.collection('coin_transfers').doc(Utils.genId());await FB.db.runTransaction(async tx=>{const s=await tx.get(sRef),t=await tx.get(tRef);if(!s.exists||!t.exists)throw Error('NOT_FOUND');const a=s.data()||{},b=t.data()||{};if(a.transferred||b.transferred||(a.balance||0)<n)throw Error('INVALID');tx.update(sRef,{balance:(a.balance||0)-n,updatedAt:Date.now()});tx.update(tRef,{balance:firebase.firestore.FieldValue.increment(n),updatedAt:Date.now()});tx.set(log,{id:log.id,fromWallet:this.wallet.id,toWallet:targetCode,amount:n,fromUid:a.ownerUid||null,toUid:b.ownerUid||null,at:Date.now()})});this.wallet.balance=(this.wallet.balance||0)-n;await Mirror.writeWallet(this.wallet);this.updateUI();UI.showToast(I18n.t('transfer.success'),'success');return true}catch(e){UI.showToast(I18n.t('coins.invalidCode'),'error');return false}};
     }
-    btn.innerHTML = '<i class="fas fa-check"></i>';
-    setTimeout(()=>btn.innerHTML='<i class="fas fa-copy"></i>',1500);
-  }));
-};
+    if(typeof Chat!=='undefined'){
+      Chat.send=async function(){const input=document.getElementById('chat-input'),content=(input?.value||'').trim();if(!content||content.length>100)return;if(!FB.ok){UI.showToast(I18n.t('coins.offline'),'warning');return}const u=FB.user,r=Coins.getRank();try{await FB.db.collection('chat').add({content,authorName:u?(u.displayName||u.email.split('@')[0]):'Guest',userUid:u?.uid||null,userRank:r.id,manualRank:Coins.userRecord?.manualRank||null,totalEarned:Coins.wallet?.totalEarned||0,createdAt:Date.now()});input.value='';const c=document.getElementById('chat-char-count');if(c)c.textContent='0/100'}catch(_){UI.showToast(I18n.t('toast.error'),'error')}};
+      Chat.render=function(){const c=document.getElementById('chat-messages');if(!c)return;if(!this.messages.length){c.innerHTML='<div class="chat-empty">'+I18n.t('chat.empty')+'</div>';return}c.innerHTML=this.messages.map(m=>{const r=KH.rank(m.totalEarned||0,m.manualRank||m.userRank);return '<div class="chat-message"><div class="chat-msg-avatar">'+KH.safe((m.authorName||'?').charAt(0).toUpperCase())+'</div><div class="chat-msg-content"><div class="chat-msg-header"><span class="chat-msg-author">'+KH.safe(m.authorName||'Anonymous')+'</span><span class="rank-badge '+r.id+' chat-msg-rank">'+KH.safe(r.name?.[I18n.lang]||r.name||r.id)+'</span><span class="chat-msg-time">'+Utils.timeAgo(m.createdAt)+'</span></div><div class="chat-msg-text">'+KH.safe(m.content||'')+'</div></div></div>'}).join('');c.scrollTop=c.scrollHeight};
+    }
+    if(typeof Comments!=='undefined'){
+      const old=Comments.submit.bind(Comments);Comments.submit=async function(pid,parentId=null){if(!FB.user)return old(pid,parentId);const root=parentId?document.getElementById('rf-'+parentId):document.getElementById('comment-form'),content=(root?.querySelector('.rf-content')?.value||document.getElementById('comment-content')?.value||'').trim();if(!content)return;const cm={id:Utils.genId(),postId:pid,parentId,authorName:FB.user.displayName||FB.user.email.split('@')[0],authorEmail:FB.user.email,content,isAdmin:false,approved:true,likes:0,createdAt:Date.now(),userRank:Coins.getRank().id,userUid:FB.user.uid,userAvatar:FB.user.photoURL||null,totalEarned:Coins.wallet?.totalEarned||0,manualRank:Coins.userRecord?.manualRank||null};try{await FB.db.collection('comments').doc(cm.id).set(cm);UI.showToast(I18n.t('comments.success'),'success');this.render(pid,await this.load(pid));if(!parentId)document.getElementById('comment-form')?.reset()}catch(_){UI.showToast(I18n.t('toast.error'),'error')}};
+    }
+    if(typeof Profile!=='undefined')Profile.render=async function(){const c=document.getElementById('profile-content');if(!c)return;if(!FB.user){c.innerHTML='<div class="empty">'+I18n.t('profile.login')+'</div>';return}const u=await loadUser()||{},name=u.name||FB.user.displayName||FB.user.email.split('@')[0],avatar=u.avatarUrl||FB.user.photoURL||'',prefs=u.preferences||{},r=Coins.getRank(),read=Object.keys(LS.get(CONFIG.keys.readProgress,{})||{}).length,bm=(LS.get(CONFIG.keys.bookmarks,[])||[]).length;c.innerHTML='<div class="profile-enhanced"><div class="profile-hero"><div class="profile-avatar-large profile-avatar-fallback">'+KH.safe(name.charAt(0).toUpperCase())+'</div><div><h3>'+KH.safe(name)+'</h3><span class="rank-badge '+r.id+'">'+KH.safe(r.name?.[I18n.lang]||r.name||r.id)+'</span><div class="profile-email">'+KH.safe(FB.user.email)+'</div></div></div><div class="profile-stats-grid"><div class="profile-stat"><div class="profile-stat-value">'+(Coins.wallet?.totalEarned||0)+'</div><div class="profile-stat-label">'+I18n.t('profile.coinsEarned')+'</div></div><div class="profile-stat"><div class="profile-stat-value">'+read+'</div><div class="profile-stat-label">'+I18n.t('profile.postsRead')+'</div></div><div class="profile-stat"><div class="profile-stat-value">'+bm+'</div><div class="profile-stat-label">'+I18n.t('reading.saved')+'</div></div></div><div class="profile-preferences"><label>Avatar URL<input id="profile-avatar-url" class="form-input" value="'+KH.safe(avatar)+'"></label><label>Language<select id="profile-language" class="form-select"><option value="en" '+(prefs.language==='en'?'selected':'')+'>English</option><option value="ar" '+(prefs.language==='ar'?'selected':'')+'>العربية</option></select></label><label>Theme<select id="profile-theme" class="form-select"><option value="dark" '+(prefs.theme==='dark'?'selected':'')+'>Dark</option><option value="light" '+(prefs.theme==='light'?'selected':'')+'>Light</option></select></label><button id="profile-save-btn" class="btn btn-primary">Save Profile</button></div></div>';document.getElementById('profile-save-btn')?.addEventListener('click',async()=>{const avatarUrl=document.getElementById('profile-avatar-url').value.trim(),language=document.getElementById('profile-language').value,theme=document.getElementById('profile-theme').value;await FB.db.collection('users').doc(FB.user.uid).set({name,avatarUrl,preferences:{language,theme},updatedAt:Date.now()},{merge:true});try{await FB.user.updateProfile({photoURL:avatarUrl||null})}catch(_){ }I18n.lang=language;LS.set(CONFIG.keys.lang,language);I18n.apply();Theme.current=theme;Theme.apply();await Profile.render();UI.showToast('Profile updated!','success')})};
+    if(typeof Router!=='undefined'&&typeof Pages!=='undefined'){const old=Router.renderCurrent.bind(Router);Router.renderCurrent=function(){const r=old();setTimeout(()=>{try{if(!location.hash.startsWith('#post/'))return;const p=Data.bySlug(location.hash.split('/')[1]);if(!p?.isAffiliate)return;const page=document.querySelector('.post-page');if(!page||page.querySelector('.inline-affiliate'))return;const a=(p.affiliateIds||[]).map(id=>Data.affiliate.find(x=>x.id===id)).find(Boolean)||Data.affiliate[0];if(!a)return;const box=document.createElement('div');box.className='inline-affiliate';box.innerHTML='<div class="inline-affiliate-icon"><i class="fas '+KH.safe(a.icon||'fa-tag')+'"></i></div><div class="inline-affiliate-info"><div class="inline-affiliate-name">'+KH.safe(a.name||'Offer')+'</div><div class="inline-affiliate-stars">★ '+Number(a.rating||5)+'</div><div class="inline-affiliate-desc">'+KH.safe(a.description||'')+'</div></div><a href="'+KH.safe(a.url||'#')+'" target="_blank" rel="noopener noreferrer nofollow" class="btn btn-gold btn-sm">'+I18n.t('affiliate.visit')+'</a>';const content=page.querySelector('.post-content');(content||page).appendChild(box)}catch(_){ }},300);return r};}
+    if(typeof Coins!=='undefined')Coins.adEarn=function(){if(!Data.settings.enableAd||this.adTimer||!this.wallet)return;const wait=Math.max(5,Number(Data.settings.adWaitSeconds||30)),adUrl=Data.settings.adUrl||'#';open(adUrl,'_blank','noopener');let left=wait;const b=document.getElementById('ad-earn-btn'),t=document.getElementById('ad-timer-text');if(b)b.disabled=true;if(t)t.textContent='Wait '+left+'s';this.adTimer=setInterval(async()=>{left--;if(t)t.textContent='Wait '+left+'s';if(left<=0){clearInterval(this.adTimer);this.adTimer=null;if(b)b.disabled=false;await this.addCoins(Number(Data.settings.adRewardAmount||5));location.href='rewards.html'}},1000)};
+    const addVideoUI=()=>{const body=document.querySelector('#coins-modal .coins-body');if(!body||document.getElementById('video-reward-box'))return;const box=document.createElement('div');box.id='video-reward-box';box.className='card-box';box.innerHTML='<h3><i class="fas fa-video"></i> Publish & Earn</h3><p>1000 views + 20 likes → 100 Coins + VIP after admin review.</p><input id="video-reward-url" class="form-input" placeholder="Video URL"><input id="video-reward-proof" class="form-input" placeholder="Screenshot proof URL"><div class="form-grid"><input id="video-reward-views" type="number" min="1000" class="form-input" placeholder="Views"><input id="video-reward-likes" type="number" min="20" class="form-input" placeholder="Likes"></div><button id="video-reward-submit" class="btn btn-primary">Submit for Review</button>';body.appendChild(box);document.getElementById('video-reward-submit').onclick=async()=>{try{const id=await KH.submitVideoReward(document.getElementById('video-reward-url').value,document.getElementById('video-reward-proof').value,document.getElementById('video-reward-views').value,document.getElementById('video-reward-likes').value);UI.showToast('Submitted: '+id,'success')}catch(e){UI.showToast(e.message==='LOGIN_REQUIRED'?'Login required':e.message==='REQUIREMENTS_NOT_MET'?'Requirements not met':'Submission failed','warning')}}};
+    if(typeof UI!=='undefined'){const old=UI.openModal.bind(UI);UI.openModal=function(id){const r=old(id);if(id==='coins-modal')setTimeout(addVideoUI,0);return r};setTimeout(addVideoUI,1000)}
+    setTimeout(()=>{const nav=document.querySelector('.navbar-links');if(nav&&!document.getElementById('rewards-nav-link')){const a=document.createElement('a');a.id='rewards-nav-link';a.className='nav-link';a.href='rewards.html';a.textContent='Rewards';nav.appendChild(a)}},800);
+    try{if(matchMedia('(prefers-reduced-motion: reduce)').matches||innerWidth<=768){document.body.classList.add('effects-disabled');if(typeof Effects!=='undefined'){Effects.enabled=false;Effects.stopParticles?.()}}}catch(_){ }
+  }
+  if(isAdmin){setTimeout(()=>{try{if(typeof auth==='undefined'||typeof db==='undefined'||!auth.currentUser)return;db.collection('users').doc(auth.currentUser.uid).get().then(s=>{if(!s.exists||s.data()?.role!=='admin'){document.getElementById('admin-dashboard').style.display='none';document.getElementById('login-screen').style.display='grid';document.getElementById('login-error').textContent='Not authorized as admin.';document.getElementById('login-error').style.display='block';auth.signOut().catch(()=>{})}})}catch(_){ }},700)}
+  KH.submitVideoReward=async(videoUrl,screenshotUrl,views,likes)=>{if(typeof FB==='undefined'||!FB.ok||!FB.user)throw Error('LOGIN_REQUIRED');const v=Number(views)||0,l=Number(likes)||0;if(!videoUrl||!screenshotUrl||v<1000||l<20)throw Error('REQUIREMENTS_NOT_MET');const id=typeof Utils!=='undefined'?Utils.genId():Date.now().toString(36);await FB.db.collection('video_reward_submissions').doc(id).set({id,uid:FB.user.uid,email:FB.user.email||'',videoUrl:String(videoUrl).trim(),screenshotUrl:String(screenshotUrl).trim(),claimedViews:v,claimedLikes:l,status:'pending',createdAt:Date.now()});return id};
+})();
