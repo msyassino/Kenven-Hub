@@ -1644,6 +1644,11 @@ const App = {
         try {
             console.log('🚀 Kenven Hub starting...');
             FB.init();
+            // Maintenance check
+            const isMaintenance = await Maintenance.check();
+            if (isMaintenance) return;
+            CookieConsent.init();
+            FB.init();
             I18n.init();
             Theme.init();
             Effects.init();
