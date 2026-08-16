@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    
+    <meta name="9e8a629b4886873d3c898c4cf281725024d91a06" content="9e8a629b4886873d3c898c4cf281725024d91a06" />
     <!-- SEO -->
     <title>Kenven Hub - Resources & Tutorials</title>
     <meta name="description" content="Kenven Hub - Your ultimate resource center for apps, tools, tutorials, and exclusive deals. Part of Kenven Service family.">
@@ -603,5 +603,135 @@
 
     <!-- ==================== APP ==================== -->
     <script src="app.js" defer></script>
+
+<!-- ==================== ADS VISIBILITY CONTROLLER ==================== -->
+<script>
+(function() {
+    'use strict';
+    
+    // Firebase config (must match admin.js)
+    const FIREBASE_CONFIG = {
+        apiKey: "AIzaSyDQ7q03kfdOQAm_B03O47GlC4v8DCru94E",
+        authDomain: "kenven-hub.firebaseapp.com",
+        projectId: "kenven-hub",
+        storageBucket: "kenven-hub.firebasestorage.app",
+        messagingSenderId: "181277894032",
+        appId: "1:181277894032:web:7f42a19f3bcf3ea3033f15",
+        measurementId: "G-VLW5MCJ2CM"
+    };
+    
+    // Ad slot mapping (HTML class/ID → Firestore field)
+    const AD_SLOTS = {
+        topBanner: '.ad-top-banner',
+        inContent: '.ad-in-content',
+        native: '.ad-native',
+        mobileBanner: '.ad-mobile-banner',
+        containerAd: '.ad-container',
+        sidebar1: '.ad-vertical-1',
+        sidebar2: '.ad-vertical-2',
+        footer: '.ad-footer',
+        coinAdLink: '#ad-earn-btn'  // Coin ad button in modal
+    };
+    
+    // Initialize Firebase (only if not already initialized)
+    function initFirebase() {
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(FIREBASE_CONFIG);
+            }
+            return firebase.firestore();
+        } catch (e) {
+            console.warn('Firebase not available for ads settings:', e);
+            return null;
+        }
+    }
+    
+    // Apply ads visibility based on settings
+    function applyAdsVisibility(settings) {
+        const defaults = {
+            enabled: true,
+            topBanner: true,
+            inContent: true,
+            native: true,
+            mobileBanner: true,
+            containerAd: true,
+            sidebar1: true,
+            sidebar2: true,
+            footer: true,
+            coinAdLink: true
+        };
+        
+        const config = { ...defaults, ...(settings || {}) };
+        
+        // Master switch: hide ALL ads if disabled
+        if (!config.enabled) {
+            document.querySelectorAll('.ad-wrapper, .ad-sidebar, .coin-method-card').forEach(el => {
+                el.style.display = 'none';
+            });
+            console.log('🚫 All ads disabled by admin');
+            return;
+        }
+        
+        // Individual slot visibility
+        Object.keys(AD_SLOTS).forEach(key => {
+            const selector = AD_SLOTS[key];
+            const elements = document.querySelectorAll(selector);
+            const visible = config[key] !== false;
+            
+            elements.forEach(el => {
+                if (el) {
+                    el.style.display = visible ? '' : 'none';
+                }
+            });
+        });
+        
+        console.log('✅ Ads visibility applied:', config);
+    }
+    
+    // Load ads settings from Firestore
+    async function loadAdsSettings() {
+        const db = initFirebase();
+        if (!db) {
+            console.warn('Cannot load ads settings - Firebase unavailable');
+            return;
+        }
+        
+        try {
+            const doc = await db.collection('settings').doc('ads').get();
+            const settings = doc.exists ? doc.data() : null;
+            applyAdsVisibility(settings);
+        } catch (e) {
+            console.warn('Failed to load ads settings:', e);
+            // Default: show all ads if settings can't be loaded
+            applyAdsVisibility(null);
+        }
+    }
+    
+    // Run when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadAdsSettings);
+    } else {
+        loadAdsSettings();
+    }
+    
+    // Also listen for real-time updates (optional but recommended)
+    function listenToAdsSettings() {
+        const db = initFirebase();
+        if (!db) return;
+        
+        db.collection('settings').doc('ads').onSnapshot(doc => {
+            const settings = doc.exists ? doc.data() : null;
+            applyAdsVisibility(settings);
+        }, err => {
+            console.warn('Ads settings listener error:', err);
+        });
+    }
+    
+    // Start real-time listener after initial load
+    setTimeout(listenToAdsSettings, 1000);
+    
+})();
+</script>
+    
 </body>
 </html>
