@@ -1,8 +1,8 @@
 /* ================================================================
    KENVEN HUB - ADMIN PANEL (ORGANIZED)
    Firebase Auth + Firestore - Full Cloud Management
-   ================================================================ */
-
+   ✅ NEW: Ads Management System
+================================================================ */
 'use strict';
 
 // ==================== 1. CONFIGURATION ====================
@@ -39,7 +39,6 @@ const AUtils = {
         d.textContent = s;
         return d.innerHTML;
     },
-    
     date(ts) {
         try {
             return new Date(ts).toLocaleDateString('en-US', {
@@ -47,11 +46,9 @@ const AUtils = {
             });
         } catch (e) { return ''; }
     },
-    
     id() {
         return Date.now().toString(36) + Math.random().toString(36).substr(2, 8);
     },
-    
     slug(t) {
         return (t || '').toLowerCase()
             .replace(/[^\w\s-]/g, '')
@@ -59,7 +56,6 @@ const AUtils = {
             .replace(/-+/g, '-')
             .trim();
     },
-    
     toast(msg, type = 'info') {
         const c = document.getElementById('toast-container');
         if (!c) return;
@@ -79,7 +75,6 @@ const AUtils = {
             setTimeout(() => t.remove(), 300);
         }, 3000);
     },
-    
     confirm(msg) { return window.confirm(msg); }
 };
 
@@ -98,10 +93,8 @@ try {
 const AdminAuth = {
     async login(email, password) {
         if (!FB_OK) return { success: false, error: 'Firebase not available' };
-        
         try {
             const cred = await auth.signInWithEmailAndPassword(email, password);
-            
             // Verify admin role
             let isAdmin = false;
             try {
@@ -111,24 +104,20 @@ const AdminAuth = {
                 // Fallback: allow known admin email
                 isAdmin = email === ADMIN_CONFIG.adminEmail;
             }
-            
             if (!isAdmin) {
                 await auth.signOut();
                 return { success: false, error: 'Not authorized as admin' };
             }
-            
             localStorage.setItem(ADMIN_CONFIG.sessionKey, JSON.stringify({
                 uid: cred.user.uid,
                 email: email,
                 time: Date.now()
             }));
-            
             return { success: true };
         } catch (e) {
             return { success: false, error: 'Invalid email or password' };
         }
     },
-    
     checkSession() {
         try {
             const s = JSON.parse(localStorage.getItem(ADMIN_CONFIG.sessionKey));
@@ -137,7 +126,6 @@ const AdminAuth = {
             return false;
         }
     },
-    
     logout() {
         localStorage.removeItem(ADMIN_CONFIG.sessionKey);
         if (FB_OK) auth.signOut();
@@ -158,7 +146,6 @@ const AData = {
             return [];
         }
     },
-    
     async savePost(data, id) {
         if (id) {
             await db.collection('posts').doc(id).update(data);
@@ -166,11 +153,9 @@ const AData = {
             await db.collection('posts').doc(data.id).set(data);
         }
     },
-    
     async deletePost(id) {
         await db.collection('posts').doc(id).delete();
     },
-    
     // --- Comments ---
     async getComments() {
         try {
@@ -180,15 +165,12 @@ const AData = {
             return [];
         }
     },
-    
     async updateComment(id, patch) {
         await db.collection('comments').doc(id).update(patch);
     },
-    
     async deleteComment(id) {
         await db.collection('comments').doc(id).delete();
     },
-    
     // --- Affiliate ---
     async getAffiliate() {
         try {
@@ -198,15 +180,12 @@ const AData = {
             return [];
         }
     },
-    
     async saveAff(data) {
         await db.collection('affiliate_links').doc(data.id).set(data);
     },
-    
     async deleteAff(id) {
         await db.collection('affiliate_links').doc(id).delete();
     },
-    
     // --- Settings ---
     async getSettings() {
         try {
@@ -216,11 +195,22 @@ const AData = {
             return null;
         }
     },
-    
     async saveSettings(obj) {
         await db.collection('settings').doc('site').set(obj, { merge: true });
     },
-    
+    // ✅ NEW: Ads Settings
+    async getAdsSettings() {
+        try {
+            const d = await db.collection('settings').doc('ads').get();
+            return d.exists ? d.data() : null;
+        } catch (e) {
+            console.warn('getAdsSettings failed:', e);
+            return null;
+        }
+    },
+    async saveAdsSettings(obj) {
+        await db.collection('settings').doc('ads').set(obj, { merge: true });
+    },
     // --- Coin Codes ---
     async getCodes() {
         try {
@@ -230,30 +220,24 @@ const AData = {
             return [];
         }
     },
-    
     async saveCode(data) {
         await db.collection('coin_codes').doc(data.code).set(data);
     },
-    
     async updateCode(code, patch) {
         await db.collection('coin_codes').doc(code).update(patch);
     },
-    
     async deleteCode(code) {
         await db.collection('coin_codes').doc(code).delete();
     },
-    
     // --- Wallets ---
     async getWallets() {
         try {
-            // Try to filter out transferred wallets first
             const s = await db.collection('wallets')
                 .where('transferred', '!=', true)
                 .limit(200)
                 .get();
             return s.docs.map(d => d.data());
         } catch (e) {
-            // Fallback: fetch all and filter locally
             try {
                 const s2 = await db.collection('wallets').limit(200).get();
                 return s2.docs.map(d => d.data()).filter(w => !w.transferred);
@@ -262,7 +246,6 @@ const AData = {
             }
         }
     },
-    
     async adjustWallet(id, delta) {
         await db.collection('wallets').doc(id).update({
             balance: firebase.firestore.FieldValue.increment(delta)
@@ -276,16 +259,13 @@ const ANav = {
         document.querySelectorAll('.admin-nav-item[data-tab]').forEach(i => {
             i.addEventListener('click', () => this.switch(i.dataset.tab));
         });
-        
         document.getElementById('view-site-btn')?.addEventListener('click', () => {
             open('index.html', '_blank');
         });
-        
         document.getElementById('logout-btn')?.addEventListener('click', () => {
             if (AUtils.confirm('Logout?')) AdminAuth.logout();
         });
     },
-    
     switch(t) {
         document.querySelectorAll('.admin-nav-item[data-tab]').forEach(i => {
             i.classList.toggle('active', i.dataset.tab === t);
@@ -295,7 +275,6 @@ const ANav = {
         });
         this.load(t);
     },
-    
     load(t) {
         switch (t) {
             case 'dashboard': Dashboard.render(); break;
@@ -304,6 +283,7 @@ const ANav = {
             case 'categories': CategoriesAdmin.render(); break;
             case 'affiliate': AffiliateAdmin.render(); break;
             case 'coins': CoinsAdmin.render(); break;
+            case 'ads': AdsAdmin.render(); break; // ✅ NEW
             case 'analytics': AnalyticsAdmin.render(); break;
             case 'settings': SettingsAdmin.render(); break;
         }
@@ -318,19 +298,15 @@ const Dashboard = {
             AData.getComments(),
             AData.getWallets()
         ]);
-        
         const views = posts.reduce((s, p) => s + (p.views || 0), 0);
         const coins = wallets.reduce((s, w) => s + (w.balance || 0), 0);
-        
         document.getElementById('stat-posts').textContent = posts.length;
         document.getElementById('stat-comments').textContent = comments.length;
         document.getElementById('stat-views').textContent = views.toLocaleString();
         document.getElementById('stat-coins').textContent = coins.toLocaleString();
-        
         document.getElementById('dashboard-date').textContent = new Date().toLocaleDateString('en-US', {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
         });
-        
         // Recent comments
         document.getElementById('recent-comments-list').innerHTML = comments.slice(0, 5).map(c =>
             '<div class="comment-item">' +
@@ -341,7 +317,6 @@ const Dashboard = {
             '<span class="status-badge ' + (c.approved ? 'status-approved' : 'status-pending') + '">' +
             (c.approved ? 'Approved' : 'Pending') + '</span></div>'
         ).join('') || '<p style="color:var(--text-muted);text-align:center;padding:var(--space-lg);">No comments yet.</p>';
-        
         // Top posts
         const top = [...posts].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5);
         document.getElementById('top-posts-list').innerHTML = top.map((p, i) =>
@@ -359,7 +334,6 @@ const Posts = {
     quill: null,
     editId: null,
     affList: [],
-    
     init() {
         document.getElementById('new-post-btn')?.addEventListener('click', () => this.showEditor());
         document.getElementById('cancel-post-btn')?.addEventListener('click', () => this.hideEditor());
@@ -367,24 +341,19 @@ const Posts = {
             e.preventDefault();
             this.save();
         });
-        
-        // Auto-generate slug from title
         document.getElementById('post-title-en')?.addEventListener('input', e => {
             const s = document.getElementById('post-slug');
             if (!s.value) s.value = AUtils.slug(e.target.value);
         });
     },
-    
     async render() {
         this.hideEditor();
         const posts = await AData.getPosts();
         const tbody = document.getElementById('posts-table-body');
-        
         if (!posts.length) {
             tbody.innerHTML = '<tr><td colspan="6" class="table-empty">No posts yet. Click "New Post".</td></tr>';
             return;
         }
-        
         tbody.innerHTML = posts.map(p => {
             const c = CATEGORIES.find(x => x.id === p.category);
             return '<tr>' +
@@ -403,27 +372,19 @@ const Posts = {
                 '</div></td></tr>';
         }).join('');
     },
-    
     async showEditor(id = null) {
         this.editId = id;
         this.affList = await AData.getAffiliate();
-        
         document.getElementById('posts-list-container').style.display = 'none';
         document.getElementById('post-editor').style.display = 'block';
         const header = document.querySelector('#tab-posts .admin-header');
         if (header) header.style.display = 'none';
-        
-        // Populate categories
         document.getElementById('post-category').innerHTML = CATEGORIES.map(c =>
             '<option value="' + c.id + '">' + c.name.en + '</option>'
         ).join('');
-        
-        // Populate affiliate checkboxes
         document.getElementById('post-affiliate-select').innerHTML = this.affList.map(a =>
             '<label class="checkbox-label"><input type="checkbox" value="' + AUtils.esc(a.id) + '" class="post-aff-check"><span>' + AUtils.esc(a.name) + '</span></label>'
         ).join('') || '<p style="color:var(--text-muted);font-size:.85rem;">No offers yet. Add them in Affiliate tab.</p>';
-        
-        // Initialize Quill editor
         if (!this.quill) {
             this.quill = new Quill('#post-content-editor', {
                 theme: 'snow',
@@ -438,8 +399,6 @@ const Posts = {
                 }
             });
         }
-        
-        // Populate form if editing
         if (id) {
             const p = (await AData.getPosts()).find(x => x.id === id);
             if (p) {
@@ -459,24 +418,18 @@ const Posts = {
                 document.getElementById('post-button-text-en').value = p.buttonText?.en || '';
                 document.getElementById('post-button-text-ar').value = p.buttonText?.ar || '';
                 document.getElementById('post-tags').value = (p.tags || []).join(', ');
-                
-                // Check selected affiliates
                 document.querySelectorAll('.post-aff-check').forEach(ch => {
                     if ((p.affiliateIds || []).includes(ch.value)) ch.checked = true;
                 });
-                
                 this.quill.root.innerHTML = p.content?.en || '';
                 return;
             }
         }
-        
-        // New post
         document.getElementById('post-editor-title').textContent = 'Create New Post';
         document.getElementById('post-form').reset();
         document.getElementById('post-coin-price').value = 0;
         this.quill.root.innerHTML = '';
     },
-    
     hideEditor() {
         document.getElementById('posts-list-container').style.display = 'block';
         document.getElementById('post-editor').style.display = 'none';
@@ -484,7 +437,6 @@ const Posts = {
         if (h) h.style.display = 'flex';
         this.editId = null;
     },
-    
     async save() {
         const tEn = document.getElementById('post-title-en').value.trim();
         const tAr = document.getElementById('post-title-ar').value.trim();
@@ -492,10 +444,8 @@ const Posts = {
             AUtils.toast('Fill both titles', 'error');
             return;
         }
-        
         const affIds = [...document.querySelectorAll('.post-aff-check:checked')].map(c => c.value);
         const existing = this.editId ? (await AData.getPosts()).find(p => p.id === this.editId) : null;
-        
         const data = {
             id: this.editId || AUtils.id(),
             title: { en: tEn, ar: tAr },
@@ -528,7 +478,6 @@ const Posts = {
             updatedAt: Date.now(),
             publishAt: null
         };
-        
         try {
             await AData.savePost(data, this.editId);
             AUtils.toast(this.editId ? 'Updated!' : 'Created!', 'success');
@@ -538,9 +487,7 @@ const Posts = {
             AUtils.toast('Save failed: ' + e.message, 'error');
         }
     },
-    
     async edit(id) { await this.showEditor(id); },
-    
     async del(id) {
         if (AUtils.confirm('Delete this post permanently?')) {
             try {
@@ -559,12 +506,10 @@ const CommentsAdmin = {
     async render() {
         const comments = await AData.getComments();
         const tbody = document.getElementById('comments-table-body');
-        
         if (!comments.length) {
             tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No comments.</td></tr>';
             return;
         }
-        
         tbody.innerHTML = comments.map(x =>
             '<tr><td><div style="font-weight:600;">' + AUtils.esc(x.authorName || '') + '</div>' +
             '<div style="font-size:.8rem;color:var(--text-muted);">' + AUtils.esc(x.authorEmail || '') + '</div></td>' +
@@ -578,7 +523,6 @@ const CommentsAdmin = {
             '</div></td></tr>'
         ).join('');
     },
-    
     async approve(id) {
         try {
             await AData.updateComment(id, { approved: true });
@@ -586,7 +530,6 @@ const CommentsAdmin = {
             this.render();
         } catch (e) {}
     },
-    
     async del(id) {
         if (AUtils.confirm('Delete comment?')) {
             try {
@@ -618,7 +561,6 @@ const AffiliateAdmin = {
     init() {
         document.getElementById('save-aff-btn')?.addEventListener('click', () => this.save());
     },
-    
     async save() {
         const name = document.getElementById('aff-name').value.trim();
         const url = document.getElementById('aff-url').value.trim();
@@ -626,7 +568,6 @@ const AffiliateAdmin = {
             AUtils.toast('Name and URL required', 'error');
             return;
         }
-        
         const data = {
             id: AUtils.id(),
             name: name,
@@ -638,7 +579,6 @@ const AffiliateAdmin = {
             clicks: 0,
             active: true
         };
-        
         try {
             await AData.saveAff(data);
             AUtils.toast('Saved!', 'success');
@@ -647,16 +587,13 @@ const AffiliateAdmin = {
             AUtils.toast('Failed', 'error');
         }
     },
-    
     async render() {
         const list = await AData.getAffiliate();
         const tbody = document.getElementById('affiliate-table-body');
-        
         if (!list.length) {
             tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No offers yet. Add your first above.</td></tr>';
             return;
         }
-        
         tbody.innerHTML = list.map(a =>
             '<tr><td style="font-weight:600;"><i class="fas ' + AUtils.esc(a.icon || 'fa-tag') + '" style="color:' + (a.color || '#5B9FFF') + ';"></i> ' + AUtils.esc(a.name || '') + '</td>' +
             '<td><a href="' + AUtils.esc(a.url || '#') + '" target="_blank" style="color:var(--neon);">' + (a.url || '').substring(0, 35) + '...</a></td>' +
@@ -666,7 +603,6 @@ const AffiliateAdmin = {
             '<td><button class="action-btn delete" onclick="AffiliateAdmin.del(\'' + a.id + '\')"><i class="fas fa-trash"></i></button></td></tr>'
         ).join('');
     },
-    
     async del(id) {
         if (AUtils.confirm('Delete offer?')) {
             try {
@@ -684,13 +620,11 @@ const CoinsAdmin = {
         document.getElementById('save-coin-settings-btn')?.addEventListener('click', () => this.saveSettings());
         document.getElementById('generate-code-btn')?.addEventListener('click', () => this.genCode());
     },
-    
     async render() {
         if (!AdminAuth.checkSession()) {
             AUtils.toast('Session expired', 'error');
             return;
         }
-        
         const s = await AData.getSettings();
         const d = {
             dailyGiftAmount: 1, adRewardAmount: 5,
@@ -700,7 +634,6 @@ const CoinsAdmin = {
             enableWhatsapp: true, enableCodes: true,
             ...(s || {})
         };
-        
         document.getElementById('coin-setting-daily').value = d.dailyGiftAmount;
         document.getElementById('coin-setting-ad-reward').value = d.adRewardAmount;
         document.getElementById('coin-setting-ad-wait').value = d.adWaitSeconds;
@@ -710,11 +643,9 @@ const CoinsAdmin = {
         document.getElementById('coin-enable-ad').checked = d.enableAd;
         document.getElementById('coin-enable-whatsapp').checked = d.enableWhatsapp;
         document.getElementById('coin-enable-codes').checked = d.enableCodes;
-        
         await this.renderCodes();
         await this.renderWallets();
     },
-    
     async saveSettings() {
         if (!AdminAuth.checkSession()) {
             AUtils.toast('Please login again', 'error');
@@ -737,27 +668,21 @@ const CoinsAdmin = {
             AUtils.toast('Failed: ' + e.message, 'error');
         }
     },
-    
     async genCode() {
         if (!AdminAuth.checkSession()) {
             AUtils.toast('Please login again', 'error');
             return;
         }
-        
         const amount = parseInt(document.getElementById('code-amount').value) || 10;
         const maxUses = parseInt(document.getElementById('code-max-uses').value) || 0;
         let code = (document.getElementById('code-text').value || '').trim().toUpperCase();
-        
         if (!code) {
             code = 'KV' + Math.random().toString(36).substr(2, 6).toUpperCase();
         }
-        
-        // Validate format
         if (!/^[A-Z0-9-]+$/.test(code)) {
             AUtils.toast('Code must be alphanumeric', 'error');
             return;
         }
-        
         try {
             await AData.saveCode({
                 code: code,
@@ -774,16 +699,13 @@ const CoinsAdmin = {
             AUtils.toast('Failed: ' + e.message, 'error');
         }
     },
-    
     async renderCodes() {
         const codes = await AData.getCodes();
         const tbody = document.getElementById('codes-table-body');
-        
         if (!codes.length) {
             tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No codes yet.</td></tr>';
             return;
         }
-        
         tbody.innerHTML = codes.map(c =>
             '<tr><td style="font-family:var(--font-mono);color:var(--gold);font-weight:700;">' + AUtils.esc(c.code) + '</td>' +
             '<td><i class="fas fa-coins" style="color:var(--gold);"></i> ' + c.amount + '</td>' +
@@ -796,14 +718,12 @@ const CoinsAdmin = {
             '</div></td></tr>'
         ).join('');
     },
-    
     async toggleCode(code, active) {
         try {
             await AData.updateCode(code, { active: active });
             await this.renderCodes();
         } catch (e) {}
     },
-    
     async delCode(code) {
         if (AUtils.confirm('Delete ' + code + '?')) {
             try {
@@ -812,16 +732,13 @@ const CoinsAdmin = {
             } catch (e) {}
         }
     },
-    
     async renderWallets() {
         const wallets = await AData.getWallets();
         const tbody = document.getElementById('wallets-table-body');
-        
         if (!wallets.length) {
             tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No wallets yet.</td></tr>';
             return;
         }
-        
         tbody.innerHTML = wallets.map(w =>
             '<tr><td style="font-family:var(--font-mono);font-size:.85rem;">' + AUtils.esc(w.id || '') + '</td>' +
             '<td style="color:var(--gold);font-weight:700;"><i class="fas fa-coins"></i> ' + (w.balance || 0) + '</td>' +
@@ -834,7 +751,6 @@ const CoinsAdmin = {
             '</div></td></tr>'
         ).join('');
     },
-    
     async adjust(id, delta) {
         try {
             await AData.adjustWallet(id, delta);
@@ -845,7 +761,93 @@ const CoinsAdmin = {
     }
 };
 
-// ==================== 14. ANALYTICS ====================
+// ==================== ✅ 14. ADS ADMIN (NEW) ====================
+const AdsAdmin = {
+    init() {
+        document.getElementById('save-ads-settings-btn')?.addEventListener('click', () => this.save());
+        
+        // Master toggle affects all individual toggles
+        document.getElementById('ads-master-toggle')?.addEventListener('change', e => {
+            const checked = e.target.checked;
+            document.querySelectorAll('.ads-slots-grid input[type="checkbox"]').forEach(cb => {
+                cb.checked = checked;
+                cb.closest('.ad-slot-card').style.opacity = checked ? '1' : '0.5';
+            });
+        });
+    },
+    async render() {
+        if (!AdminAuth.checkSession()) {
+            AUtils.toast('Session expired', 'error');
+            return;
+        }
+        
+        // Load settings with defaults
+        const s = await AData.getAdsSettings();
+        const defaults = {
+            enabled: true,
+            topBanner: true,
+            inContent: true,
+            native: true,
+            mobileBanner: true,
+            containerAd: true,
+            sidebar1: true,
+            sidebar2: true,
+            footer: true,
+            coinAdLink: true
+        };
+        const settings = { ...defaults, ...(s || {}) };
+        
+        // Master toggle
+        document.getElementById('ads-master-toggle').checked = settings.enabled;
+        
+        // Individual toggles
+        document.getElementById('ads-top-banner').checked = settings.topBanner;
+        document.getElementById('ads-in-content').checked = settings.inContent;
+        document.getElementById('ads-native').checked = settings.native;
+        document.getElementById('ads-mobile').checked = settings.mobileBanner;
+        document.getElementById('ads-container').checked = settings.containerAd;
+        document.getElementById('ads-sidebar-1').checked = settings.sidebar1;
+        document.getElementById('ads-sidebar-2').checked = settings.sidebar2;
+        document.getElementById('ads-footer').checked = settings.footer;
+        document.getElementById('ads-coin-link').checked = settings.coinAdLink;
+        
+        // Update visual state
+        document.querySelectorAll('.ads-slots-grid input[type="checkbox"]').forEach(cb => {
+            cb.closest('.ad-slot-card').style.opacity = cb.checked ? '1' : '0.5';
+        });
+        
+        AUtils.toast('Ads settings loaded', 'info');
+    },
+    async save() {
+        if (!AdminAuth.checkSession()) {
+            AUtils.toast('Please login again', 'error');
+            return;
+        }
+        
+        const settings = {
+            enabled: document.getElementById('ads-master-toggle').checked,
+            topBanner: document.getElementById('ads-top-banner').checked,
+            inContent: document.getElementById('ads-in-content').checked,
+            native: document.getElementById('ads-native').checked,
+            mobileBanner: document.getElementById('ads-mobile').checked,
+            containerAd: document.getElementById('ads-container').checked,
+            sidebar1: document.getElementById('ads-sidebar-1').checked,
+            sidebar2: document.getElementById('ads-sidebar-2').checked,
+            footer: document.getElementById('ads-footer').checked,
+            coinAdLink: document.getElementById('ads-coin-link').checked,
+            updatedAt: Date.now()
+        };
+        
+        try {
+            await AData.saveAdsSettings(settings);
+            AUtils.toast('Ads settings saved successfully!', 'success');
+        } catch (e) {
+            AUtils.toast('Failed to save: ' + e.message, 'error');
+        }
+    }
+};
+
+// ==================== 15. ANALYTICS ====================
 const AnalyticsAdmin = {
     async render() {
         const [posts, comments, wallets] = await Promise.all([
@@ -853,19 +855,15 @@ const AnalyticsAdmin = {
             AData.getComments(),
             AData.getWallets()
         ]);
-        
         const views = posts.reduce((s, x) => s + (x.views || 0), 0);
         const coins = wallets.reduce((s, x) => s + (x.balance || 0), 0);
-        
         document.getElementById('analytics-total-views').textContent = views.toLocaleString();
         document.getElementById('analytics-avg-views').textContent = posts.length ? Math.round(views / posts.length) : 0;
         document.getElementById('analytics-total-comments').textContent = comments.length;
         document.getElementById('analytics-coins').textContent = coins.toLocaleString();
-        
         const max = Math.max(...CATEGORIES.map(cat =>
             posts.filter(x => x.category === cat.id).reduce((s, x) => s + (x.views || 0), 0)
         ), 1);
-        
         document.getElementById('category-analytics').innerHTML = CATEGORIES.map(cat => {
             const v = posts.filter(x => x.category === cat.id).reduce((s, x) => s + (x.views || 0), 0);
             return '<div class="progress-item">' +
@@ -878,7 +876,7 @@ const AnalyticsAdmin = {
     }
 };
 
-// ==================== 15. SETTINGS ====================
+// ==================== 16. SETTINGS ====================
 const SettingsAdmin = {
     async render() {
         const s = await AData.getSettings();
@@ -901,33 +899,33 @@ const SettingsAdmin = {
             }
         };
         
-        // Maintenance Mode
-const maint = s?.maintenance || {};
-document.getElementById('maintenance-enabled').checked = !!maint.enabled;
-document.getElementById('maintenance-message').value = maint.message || '';
-document.getElementById('maintenance-eta').value = maint.eta || '';
-document.getElementById('save-maintenance-btn').onclick = async () => {
-    try {
-        await AData.saveSettings({
-            maintenance: {
-                enabled: document.getElementById('maintenance-enabled').checked,
-                message: document.getElementById('maintenance-message').value.trim(),
-                eta: document.getElementById('maintenance-eta').value.trim()
+        const maint = s?.maintenance || {};
+        document.getElementById('maintenance-enabled').checked = !!maint.enabled;
+        document.getElementById('maintenance-message').value = maint.message || '';
+        document.getElementById('maintenance-eta').value = maint.eta || '';
+        document.getElementById('save-maintenance-btn').onclick = async () => {
+            try {
+                await AData.saveSettings({
+                    maintenance: {
+                        enabled: document.getElementById('maintenance-enabled').checked,
+                        message: document.getElementById('maintenance-message').value.trim(),
+                        eta: document.getElementById('maintenance-eta').value.trim()
+                    }
+                });
+                AUtils.toast('Maintenance settings saved!', 'success');
+            } catch (e) {
+                AUtils.toast('Failed: ' + e.message, 'error');
             }
-        });
-        AUtils.toast('Maintenance settings saved!', 'success');
-    } catch (e) {
-        AUtils.toast('Failed: ' + e.message, 'error');
-    }
-};
-       document.getElementById('reload-cache-btn').onclick = () => {
+        };
+        
+        document.getElementById('reload-cache-btn').onclick = () => {
             AUtils.toast('Reloading...', 'info');
             setTimeout(() => location.reload(), 800);
         };
     }
 };
 
-// ==================== 16. ADMIN APP INIT ====================
+// ==================== 17. ADMIN APP INIT ====================
 const AdminApp = {
     init() {
         console.log('🔐 Admin Panel starting...');
@@ -946,13 +944,10 @@ const AdminApp = {
             const pass = document.getElementById('login-password').value;
             const err = document.getElementById('login-error');
             err.style.display = 'none';
-            
             const btn = e.target.querySelector('button[type="submit"]');
             btn.disabled = true;
-            
             const r = await AdminAuth.login(email, pass);
             btn.disabled = false;
-            
             if (r.success) {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('admin-dashboard').style.display = 'block';
@@ -969,6 +964,7 @@ const AdminApp = {
         Posts.init();
         AffiliateAdmin.init();
         CoinsAdmin.init();
+        AdsAdmin.init(); // ✅ NEW
         
         // Session timeout check
         setInterval(() => {
@@ -989,3 +985,4 @@ window.Posts = Posts;
 window.CommentsAdmin = CommentsAdmin;
 window.AffiliateAdmin = AffiliateAdmin;
 window.CoinsAdmin = CoinsAdmin;
+window.AdsAdmin = AdsAdmin; // ✅ NEW
