@@ -48,22 +48,6 @@
     <!-- Stylesheet -->
     <link rel="stylesheet" href="style.css">
     
-    <!-- ==================== ADS STYLING (Responsive Containers) ==================== -->
-    <style>
-        .ad-wrapper { text-align: center; margin: 15px auto; padding: 10px; max-width: 100%; overflow: hidden; }
-        .ad-wrapper.desktop { display: block; }
-        .ad-wrapper.mobile { display: none; }
-        .sidebar-ads-container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin: 20px auto; padding: 10px; max-width: 1200px; }
-        .main-ads-container { display: flex; flex-direction: column; align-items: center; gap: 20px; margin: 20px auto; max-width: 1200px; }
-        .smartlink-banner { display: inline-flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #6e8efb, #a777e3); color: #fff !important; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s; }
-        .smartlink-banner:hover { transform: translateY(-2px); }
-        @media (max-width: 768px) {
-            .ad-wrapper.desktop { display: none; }
-            .ad-wrapper.mobile { display: block; }
-            .sidebar-ads-container { flex-direction: column; align-items: center; }
-        }
-    </style>
-
     <!-- Structured Data -->
     <script type="application/ld+json">
     {
@@ -175,93 +159,10 @@
         </div>
     </nav>
 
-    <!-- ==================== TOP ADS (728x90 Desktop & 320x50 Mobile) ==================== -->
-    <div class="ad-wrapper desktop">
-        <script>
-          atOptions = {
-            'key' : '2ef7fecaa89f94a885b99814529b4637',
-            'format' : 'iframe',
-            'height' : 90,
-            'width' : 728,
-            'params' : {}
-          };
-        </script>
-        <script src="https://www.highperformanceformat.com/2ef7fecaa89f94a885b99814529b4637/invoke.js"></script>
-    </div>
-    <div class="ad-wrapper mobile">
-        <script>
-          atOptions = {
-            'key' : 'f621d88e9b802b663e028c262b5ca773',
-            'format' : 'iframe',
-            'height' : 50,
-            'width' : 320,
-            'params' : {}
-          };
-        </script>
-        <script src="https://www.highperformanceformat.com/f621d88e9b802b663e028c262b5ca773/invoke.js"></script>
-    </div>
-
     <!-- ==================== MAIN CONTENT ==================== -->
     <main id="main-content" class="main-content" role="main">
-        
-        <!-- ==================== MAIN CONTENT ADS (Native, Smartlink, 468x60) ==================== -->
-        <div class="main-ads-container">
-            <!-- Smartlink Button -->
-            <a href="https://www.effectivecpmnetwork.com/d4ce36emmc?key=4c057264ab9357d62970eea5a484fd9c" target="_blank" rel="noopener noreferrer sponsored" class="smartlink-banner">
-                <i class="fas fa-ad"></i> View Sponsored Link & Earn Coins
-            </a>
-
-            <!-- Native Banner -->
-            <div class="ad-wrapper">
-                <script async="async" data-cfasync="false" src="https://pl30868429.effectivecpmnetwork.com/bc0c15e1a0a910631407d5ab1aa31cde/invoke.js"></script>
-                <div id="container-bc0c15e1a0a910631407d5ab1aa31cde"></div>
-            </div>
-
-            <!-- 468x60 Banner -->
-            <div class="ad-wrapper">
-                <script>
-                  atOptions = {
-                    'key' : 'c1fe060a75c80304165a833f0258c83e',
-                    'format' : 'iframe',
-                    'height' : 60,
-                    'width' : 468,
-                    'params' : {}
-                  };
-                </script>
-                <script src="https://www.highperformanceformat.com/c1fe060a75c80304165a833f0258c83e/invoke.js"></script>
-            </div>
-        </div>
-
         <div id="app-container" class="app-container"></div>
     </main>
-
-    <!-- ==================== SIDEBAR/BOTTOM ADS (160x600 & 160x300) ==================== -->
-    <section class="sidebar-ads-container">
-        <div class="ad-wrapper">
-            <script>
-              atOptions = {
-                'key' : 'a875b0902f51dd6be63949e396a6ded1',
-                'format' : 'iframe',
-                'height' : 600,
-                'width' : 160,
-                'params' : {}
-              };
-            </script>
-            <script src="https://www.highperformanceformat.com/a875b0902f51dd6be63949e396a6ded1/invoke.js"></script>
-        </div>
-        <div class="ad-wrapper">
-            <script>
-              atOptions = {
-                'key' : 'ea243d2f8b1adbacedf212ddc1dda8d3',
-                'format' : 'iframe',
-                'height' : 300,
-                'width' : 160,
-                'params' : {}
-              };
-            </script>
-            <script src="https://www.highperformanceformat.com/ea243d2f8b1adbacedf212ddc1dda8d3/invoke.js"></script>
-        </div>
-    </section>
 
     <!-- ==================== FOOTER ==================== -->
     <footer class="footer" role="contentinfo">
@@ -551,13 +452,5 @@
 
     <!-- ==================== APP ==================== -->
     <script src="app.js" defer></script>
-
-    <!-- ==================== BACKGROUND ADS (Popunder, SocialBar, Monetag) ==================== -->
-    <!-- Monetag Global Tag -->
-    <script src="https://quge5.com/88/tag.min.js" data-zone="270554" async data-cfasync="false"></script>
-    <!-- Adsterra Popunder -->
-    <script src="https://pl30868426.effectivecpmnetwork.com/8c/77/b6/8c77b6375f2f1aa3a783f86638724009.js"></script>
-    <!-- Adsterra Social Bar -->
-    <script src="https://pl30868427.effectivecpmnetwork.com/6b/76/6c/6b766c60889ab743915a06c41f2f2292.js"></script>
 </body>
 </html>
